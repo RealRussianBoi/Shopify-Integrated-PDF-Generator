@@ -134,12 +134,15 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
 
   // Selection: Set in ref to reduce lag
   const checkedRef = useRef(new Set());
+  const selectedVariantsRef = useRef(new Map());
   const [checkedVersion, setCheckedVersion] = useState(0);
   const allSelectedProductsRef = useRef(new Set()); // productPk where ALL variants are selected (even unloaded)
   const unselectedInAllRef = useRef(new Map()); // productPk -> Set(variantKey) exceptions when all-selected
 
   // Sticky product header (current product in viewport)
   const [stickyProductPk, setStickyProductPk] = useState(null);
+  const [firstVisibleIndex, setFirstVisibleIndex] = useState(0);
+  const showStickyHeader = firstVisibleIndex > 0;
 
   // Reset when dialog opens / initialSearch changes
   useEffect(() => {
@@ -155,6 +158,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
 
     checkedRef.current = new Set();
     setCheckedVersion((v) => v + 1);
+    selectedVariantsRef.current = new Map();
 
     setProducts([]);
     setProductOffset(0);
@@ -182,6 +186,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
     activeSearchFieldRef.current = "productTitle";
 
     checkedRef.current = new Set();
+    selectedVariantsRef.current = new Map();
     allSelectedProductsRef.current = new Set();
     unselectedInAllRef.current = new Map();
     loadingVariantsRef.current = new Map();
@@ -235,6 +240,11 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
     return false;
   }, [checkedVersion, products]);
 
+  const selectedCount = useMemo(() => {
+    void checkedVersion;
+    return selectedVariantsRef.current.size;
+  }, [checkedVersion]);
+
   const isVariantChecked = useCallback((productPk, variantKey) => {
     const pk = String(productPk);
     if (!variantKey) return false;
@@ -245,29 +255,6 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
     }
     return checkedRef.current.has(variantKey);
   }, []);
-
-  const toggleVariantKey = useCallback(
-    (productPk, variantKey) => {
-      if (!variantKey) return;
-
-      const pk = String(productPk);
-
-      if (allSelectedProductsRef.current.has(pk)) {
-        const unselected = getUnselectedSetForProduct(pk);
-        if (unselected.has(variantKey)) unselected.delete(variantKey);
-        else unselected.add(variantKey);
-        setCheckedVersion((v) => v + 1);
-        return;
-      }
-
-      const s = checkedRef.current;
-      if (s.has(variantKey)) s.delete(variantKey);
-      else s.add(variantKey);
-
-      setCheckedVersion((v) => v + 1);
-    },
-    [getUnselectedSetForProduct]
-  );
 
   const getProductCheckboxState = useCallback((product) => {
     const pk = String(product?.productPk ?? "");
@@ -305,22 +292,40 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
     const unselected = unselectedInAllRef.current.get(pk);
     const hasExceptions = !!unselected && unselected.size > 0;
 
+    // case: turning OFF (it was truly all-selected)
     if (isAllSelected && !hasExceptions) {
       allSelectedProductsRef.current.delete(pk);
       unselectedInAllRef.current.delete(pk);
 
+      // remove loaded variants from persistent store
       const keys = (product.variants || []).map(getVariantKey).filter(Boolean);
-      keys.forEach((k) => checkedRef.current.delete(k));
+      keys.forEach((k) => {
+        checkedRef.current.delete(k);
+        selectedVariantsRef.current.delete(k);
+      });
 
       setCheckedVersion((v) => v + 1);
       return;
     }
 
+    // turning ON (select all)
     allSelectedProductsRef.current.add(pk);
     unselectedInAllRef.current.delete(pk);
 
-    const keys = (product.variants || []).map(getVariantKey).filter(Boolean);
-    keys.forEach((k) => checkedRef.current.delete(k));
+    // add loaded variants to persistent store
+    for (const v of product.variants || []) {
+      const k = getVariantKey(v);
+      if (!k) continue;
+
+      checkedRef.current.delete(k);
+      selectedVariantsRef.current.set(k, {
+        productPk: product.productPk,
+        productTitle: product.productTitle,
+        productImage1: product.productImage1,
+        sku: product.sku,
+        ...v,
+      });
+    }
 
     setCheckedVersion((v) => v + 1);
   }, []);
@@ -442,15 +447,39 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
     [companyPk, normalizeProducts]
   );
 
+  useEffect(() => {
+    // bring selection payloads up-to-date for whatever is currently loaded
+    for (const p of products) {
+      const productPk = String(p.productPk);
+
+      const isAllSelectedForProduct = allSelectedProductsRef.current.has(productPk);
+      const unselected = unselectedInAllRef.current.get(productPk) || new Set();
+
+      for (const v of p.variants || []) {
+        const k = getVariantKey(v);
+        if (!k) continue;
+
+        const isSelected = isAllSelectedForProduct ? !unselected.has(k) : checkedRef.current.has(k);
+
+        if (isSelected) {
+          selectedVariantsRef.current.set(k, {
+            productPk: p.productPk,
+            productTitle: p.productTitle,
+            productImage1: p.productImage1,
+            sku: p.sku,
+            ...v,
+          });
+        }
+      }
+    }
+  }, [products]);
+
   const triggerSearch = useCallback(async () => {
     const nextSearch = String(filterInput || "").trim();
     const nextField = String(searchField || "productTitle");
 
     activeSearchRef.current = nextSearch;
     activeSearchFieldRef.current = nextField;
-
-    checkedRef.current = new Set();
-    setCheckedVersion((v) => v + 1);
 
     setProducts([]);
     setStickyProductPk(null);
@@ -547,36 +576,10 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
   );
 
   const handleAddSelected = useCallback(() => {
-    const selected = [];
-
-    for (const p of products) {
-      const productPk = String(p.productPk);
-
-      const isAllSelectedForProduct = allSelectedProductsRef.current.has(productPk);
-      const unselected = unselectedInAllRef.current.get(productPk) || new Set();
-
-      for (const v of p.variants || []) {
-        const k = getVariantKey(v);
-        if (!k) continue;
-
-        const isSelected =
-          isAllSelectedForProduct ? !unselected.has(k) : checkedRef.current.has(k);
-
-        if (isSelected) {
-          selected.push({
-            productPk: p.productPk,
-            productTitle: p.productTitle,
-            productImage1: p.productImage1,
-            sku: p.sku,
-            ...v,
-          });
-        }
-      }
-    }
-
+    const selected = Array.from(selectedVariantsRef.current.values());
     onAddSelected?.(selected);
     onClose?.();
-  }, [onAddSelected, onClose, products]);
+  }, [onAddSelected, onClose]);
 
   const rows = useMemo(() => {
     const out = [];
@@ -601,6 +604,64 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
     for (const p of products) m.set(String(p.productPk), p);
     return m;
   }, [products]);
+
+  const toggleVariantKey = useCallback(
+    (productPk, variantKey) => {
+      if (!variantKey) return;
+
+      const pk = String(productPk);
+
+      // helper to get payload (only for loaded variants)
+      const buildPayload = () => {
+        const p = productByPk.get(pk);
+        if (!p) return null;
+
+        const v = (p.variants || []).find((x) => getVariantKey(x) === variantKey);
+        if (!v) return null;
+
+        return {
+          productPk: p.productPk,
+          productTitle: p.productTitle,
+          productImage1: p.productImage1,
+          sku: p.sku,
+          ...v,
+        };
+      };
+
+      if (allSelectedProductsRef.current.has(pk)) {
+        const unselected = getUnselectedSetForProduct(pk);
+
+        const willBeSelected = unselected.has(variantKey); // removing exception means selected
+        if (unselected.has(variantKey)) unselected.delete(variantKey);
+        else unselected.add(variantKey);
+
+        if (willBeSelected) {
+          const payload = buildPayload();
+          if (payload) selectedVariantsRef.current.set(variantKey, payload);
+        } else {
+          selectedVariantsRef.current.delete(variantKey);
+        }
+
+        setCheckedVersion((v) => v + 1);
+        return;
+      }
+
+      const s = checkedRef.current;
+      const willSelect = !s.has(variantKey);
+
+      if (willSelect) {
+        s.add(variantKey);
+        const payload = buildPayload();
+        if (payload) selectedVariantsRef.current.set(variantKey, payload);
+      } else {
+        s.delete(variantKey);
+        selectedVariantsRef.current.delete(variantKey);
+      }
+
+      setCheckedVersion((v) => v + 1);
+    },
+    [getUnselectedSetForProduct, productByPk]
+  );
 
   const variantByProductVariantPk = useMemo(() => {
     const m = new Map();
@@ -728,7 +789,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
   const stickyProduct = stickyProductPk ? productByPk.get(String(stickyProductPk)) : null;
 
   const StickyProductHeader = useMemo(() => {
-    if (!stickyProduct) return null;
+    if (!stickyProduct || !showStickyHeader) return null;
 
     const { allChecked, someChecked, disabled: productDisabled } = getProductCheckboxState(stickyProduct);
 
@@ -799,7 +860,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
         </Typography>
       </Box>
     );
-  }, [checkedVersion, getProductCheckboxState, isLgDown, sectionBg, stickyProduct, toggleAllForProduct]);
+  }, [checkedVersion, getProductCheckboxState, isLgDown, sectionBg, stickyProduct, toggleAllForProduct, showStickyHeader]);
 
   const rowRenderer = useCallback(
     ({ index, key, style }) => {
@@ -1115,6 +1176,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
                       rowRenderer={rowRenderer}
                       overscanRowCount={10}
                       onRowsRendered={({ startIndex }) => {
+                        setFirstVisibleIndex(startIndex);
                         const pk = findStickyProductPkFromStartIndex(startIndex);
                         setStickyProductPk(pk);
                       }}
@@ -1127,13 +1189,19 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose} disabled={disabled}>
-          Cancel
-        </Button>
-        <Button variant="contained" disabled={!anySelections || disabled} onClick={handleAddSelected}>
-          Add selected
-        </Button>
+      <DialogActions sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Typography variant="body2" color="text.secondary" sx={{ pl: 1 }}>
+          {selectedCount.toLocaleString()} Selected
+        </Typography>
+
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button onClick={onClose} disabled={disabled}>
+            Cancel
+          </Button>
+          <Button variant="contained" disabled={!anySelections || disabled} onClick={handleAddSelected}>
+            Add selected
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );
