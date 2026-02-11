@@ -61,7 +61,7 @@ const MemoSearchProductsBar = memo(function MemoSearchProductsBar({ disabled, on
 
   return (
     <Grid container spacing={2} alignItems="center">
-      <Grid item xs={12} md={10}>
+      <Grid size={{ xs: 12, md: 10 }}>
         <TextField
           fullWidth
           label={searchLabel}
@@ -87,7 +87,7 @@ const MemoSearchProductsBar = memo(function MemoSearchProductsBar({ disabled, on
         />
       </Grid>
 
-      <Grid item xs={12} md={2}>
+      <Grid size={{ xs: 12, md: 2 }}>
         <Button fullWidth variant="outlined" color="warning" disabled={disabled} onClick={trigger}>
           Browse
         </Button>
@@ -98,7 +98,6 @@ const MemoSearchProductsBar = memo(function MemoSearchProductsBar({ disabled, on
 
 const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
   open,
-  companyPk,
   darkMode,
   disabled,
   initialSearch,
@@ -413,7 +412,6 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
 
   const fetchProductsPage = useCallback(
     async ({ offset, replace, search, searchField: searchFieldArg }) => {
-      if (!companyPk || isNaN(Number(companyPk))) return;
 
       const setLoading = replace ? setLoadingProducts : setLoadingMoreProducts;
       setLoading(true);
@@ -421,7 +419,6 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
       try {
         const res = await axios.get("http://localhost:4000/product-browser-list", {
           params: {
-            companyPk,
             search: String(search || "").trim(),
             searchField: String(searchFieldArg || "all"),
             productOffset: offset,
@@ -444,7 +441,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
         setLoading(false);
       }
     },
-    [companyPk, normalizeProducts]
+    [normalizeProducts]
   );
 
   useEffect(() => {
@@ -525,7 +522,6 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
         while (offset < total) {
           const res = await axios.get("http://localhost:4000/product-browser-variants", {
             params: {
-              companyPk,
               productPk,
               variantOffset: offset,
               variantLimit: 100,
@@ -572,7 +568,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
         setLoadingVariants(key, false);
       }
     },
-    [companyPk, isLoadingVariants, setLoadingVariants]
+    [isLoadingVariants, setLoadingVariants]
   );
 
   const handleAddSelected = useCallback(() => {
@@ -1207,7 +1203,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
   );
 });
 
-function ProductBrowser({ companyPk, darkMode = false, disabled = false, searchLabel = "Search products", onAddSelected }) {
+function ProductBrowser({ darkMode = false, disabled = false, searchLabel = "Search products", onAddSelected }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSearchPreset, setDialogSearchPreset] = useState("");
 
@@ -1233,7 +1229,6 @@ function ProductBrowser({ companyPk, darkMode = false, disabled = false, searchL
 
       <MemoProductBrowserDialog
         open={dialogOpen}
-        companyPk={companyPk}
         darkMode={darkMode}
         disabled={disabled}
         initialSearch={dialogSearchPreset}
@@ -1245,7 +1240,6 @@ function ProductBrowser({ companyPk, darkMode = false, disabled = false, searchL
 }
 
 ProductBrowser.propTypes = {
-  companyPk: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   darkMode: PropTypes.bool,
   disabled: PropTypes.bool,
   searchLabel: PropTypes.string,

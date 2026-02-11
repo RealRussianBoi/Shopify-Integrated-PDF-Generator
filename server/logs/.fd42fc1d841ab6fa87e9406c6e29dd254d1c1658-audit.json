@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\Programming\\Projects\\Shopify-Integrated-PDF-Generator\\server\\logs\\.fd42fc1d841ab6fa87e9406c6e29dd254d1c1658-audit.json",
+    "files": [
+        {
+            "date": 1770850214427,
+            "name": "D:\\Programming\\Projects\\Shopify-Integrated-PDF-Generator\\server\\logs\\combined-2026-02-11.log",
+            "hash": "7a72af40de612ee04620c5a579d33f029998570e1b687161cb63ebe3e5a9fe16"
+        }
+    ],
+    "hashType": "sha256"
+}

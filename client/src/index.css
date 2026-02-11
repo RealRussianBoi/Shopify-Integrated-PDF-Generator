@@ -1,68 +1,221 @@
+/* ========================================
+   🌐 Tailwind Base Utilities
+======================================== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================================
+   🌍 Global & Root-Level Styles
+======================================== */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  background: #f4f4f4;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
-body {
-  margin: 0;
+html, body, #root, .App {
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========================================
+   🌙 Dark Mode Styles
+======================================== */
+body.dark {
+  background: #121212;
+  color: #fff;
+}
+
+/* ========================================
+   🧭 Layout & Positioning Helpers
+======================================== */
+.ml-transition {
+  transition: margin-left 0.3s ease;
+}
+
+.content-under-header {
+  position: relative;
+  z-index: 5;
+  padding-top: 50px;
+  height: calc(100vh - 50px);
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  flex-direction: column;
+  overflow: auto;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@media (max-width: 640px) {
+  .content-under-header {
+    padding-top: 45px;
+    height: calc(100vh - 45px);
   }
-  a:hover {
-    color: #747bff;
+}
+
+@media (min-width: 768px) {
+  .content-under-header {
+    transition: margin-left 0.3s ease;
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+/* ========================================
+   🪟 Modal & Overlay
+======================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+}
+
+/* ========================================
+   ⚙️ Settings & UI Cards
+======================================== */
+.settings-card {
+  width: 100%;
+  max-width: 1000px;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+/* ========================================
+   🧾 Tables & Responsive Containers
+======================================== */
+.responsive-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========================================
+   📱 Mobile UX & Touch Targets
+======================================== */
+@media (max-width: 640px) {
+  button,
+  [role="button"],
+  a {
+    min-height: 32px;
+    min-width: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 32px;
+    font-size: 14px;
+  }
+}
+
+/* ========================================
+   🪜 Z-Index & Layer Fixes
+======================================== */
+#leftHandMenuBox {
+  z-index: 40 !important;
+}
+
+h1, h2, h3, h4, h5, h6, .MuiTypography-root {
+  position: relative;
+  z-index: 5;
+}
+
+/* ========================================
+   🎨 MUI Component Overrides
+======================================== */
+
+/* Paper */
+.MuiPaper-root {
+  max-height: none !important;
+  padding: 8px !important;
+}
+
+/* Form Controls */
+.MuiFormControl-root {
+  margin-bottom: 4px !important;
+}
+
+.MuiFormLabel-root.MuiInputLabel-root {
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+/* Inputs */
+.MuiInputBase-root {
+  min-height: 36px !important;
+}
+
+.MuiOutlinedInput-root {
+  padding: 0 !important;
+}
+
+.MuiOutlinedInput-input {
+  padding: 10px 14px !important;
+  font-size: 0.8rem !important;
+}
+
+.MuiInputBase-input {
+  line-height: 1.2 !important;
+}
+
+.MuiInputLabel-root {
+  font-size: 0.8rem !important;
+  transform: translate(14px, 12px) scale(1) !important;
+}
+
+.MuiInputLabel-shrink {
+  transform: translate(14px, -6px) scale(0.75) !important;
+}
+
+/* Grid */
+.MuiGrid-container {
+  width: 100%;
+  margin: 0;
+}
+
+/* Dividers */
+.MuiDivider-root {
+  margin: 4px 0 !important;
+}
+
+/* Buttons */
+.MuiButton-root {
+  padding: 4px 10px !important;
+  font-size: 0.75rem !important;
+}
+
+/* Icons */
+.MuiSvgIcon-root {
+  font-size: 1.2rem !important;
+}
+
+/* Avatars */
+.MuiAvatar-root {
+  font-size: 1.2rem !important;
+}
+
+/* Shrinks pages on larger screens */
+.page-responsive-width {
+  width: 100%;
+
+  /* lg: 1024px and up */
+  @media (min-width: 1024px) {
+    width: 70%;
+  }
+
+  /* xl: 1280px and up */
+  @media (min-width: 1280px) {
+    width: 55%;
   }
 }
