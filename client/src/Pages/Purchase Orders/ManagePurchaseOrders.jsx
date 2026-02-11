@@ -56,7 +56,6 @@ function ManagePurchaseOrder({
   setNavbarActions = () => {},
 }) {
   const { darkMode } = useTheme();
-  const { companyData } = useContext(AppContext);
   const { poPk } = useParams();
   const poListPk = Number(poPk);
 
