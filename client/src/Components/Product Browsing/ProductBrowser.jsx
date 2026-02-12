@@ -428,6 +428,9 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
           },
         });
 
+        console.log(res);
+        
+
         const incoming = res?.data?.products || [];
         const more = !!res?.data?.hasMoreProducts;
 
@@ -695,7 +698,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
   const renderFilters = useMemo(() => {
     const filtersUI = (
       <Grid container spacing={2} sx={{ mb: 2 }} alignItems="center">
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <TextField
             fullWidth
             size="small"
@@ -725,7 +728,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
           />
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <FormControl fullWidth size="small">
             <InputLabel id="pb-search-field-label">Search by</InputLabel>
             <Select

@@ -610,6 +610,55 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   ]);
 
   // -----------------------------
+  // Totals / Summary
+  // -----------------------------
+  const money = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const formatMoney = (value, decimals = 4) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return (0).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+    return n.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  };
+
+  const tableSubtotal = useMemo(() => {
+    const rows = Array.isArray(tableRows) ? tableRows : [];
+    const sum = rows.reduce((acc, r) => {
+      // Prefer costExtended (what your grid writes), fall back to itemCostExtended if older data exists
+      const line = money(r?.costExtended ?? r?.itemCostExtended ?? 0);
+      return acc + line;
+    }, 0);
+
+    return roundTo(sum, 4);
+  }, [tableRows]);
+
+  const discountPercent = watch("discountPercent");
+  const discountAmount  = watch("discountAmount");
+  const freight         = watch("freight");
+  const fee             = watch("fee");
+  const tax             = watch("tax");
+
+  const summaryCalc = useMemo(() => {
+    const dp = money(discountPercent);
+    const da = money(discountAmount);
+    const fr = money(freight);
+    const fe = money(fee);
+    const tx = money(tax);
+
+    const percentDiscountValue = roundTo(tableSubtotal * (dp / 100), 4);
+    const netAdditional = roundTo(-percentDiscountValue - da + fr + fe + tx, 4);
+    const tableTotal = roundTo(tableSubtotal + netAdditional, 4);
+
+    return { dp, da, fr, fe, tx, percentDiscountValue, netAdditional, tableTotal };
+  }, [tableSubtotal, discountPercent, discountAmount, freight, fee, tax]);
+
+  // -----------------------------
   // UI helpers (unchanged)
   // -----------------------------
   const handleUidAssign = (array) => {
@@ -623,28 +672,23 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
   const getItemDetails = async (selectedVariants) => {
     try {
-      const destinationPk = String(watch("destinationPk") || "").trim();
-
       const response = await axios.get("http://localhost:4000/purchase-order/get/item-data", {
         params: {
-          selectedPks: selectedVariants.map((s) => s.variantPk),
-          companyPk: companyData,
-          destinationPk: destinationPk || null,
+          selectedPks: selectedVariants.map((s) => s.variantPk), // Shopify variant GID
         },
       });
 
       const items = (response.data.items || []).map((r) => ({
         ...r,
 
-        // Ensure numeric defaults
         qtyOnHand: Number(r.qtyOnHand || 0),
-        qtyOnOrder: Number(r.qtyOnOrder || 0),
 
-        // baseline from the variant’s current purchase description at time of adding
+        qtyOnOrder: 0,
+
         variantDescriptionPurchaseBaseline: String(r?.variantDescriptionPurchase ?? "").trim(),
       }));
 
-      const updatedRows = handleUidAssign([...tableRows, ...items]);
+      const updatedRows = handleUidAssign([...(Array.isArray(tableRows) ? tableRows : []), ...items]);
       setTableRows(updatedRows);
     } catch (error) {
       console.error(`Error fetching selected variants to add to purchase order:\n\n${error.message}`);
@@ -695,26 +739,17 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
   const LEFT = { align: "left", headerAlign: "left" };
 
-  const tryNavigateWithWarning = (e, href) => {
-    if (!href) return;
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (isDirty) {
-      openRedirectWarning({
-        title: "Leave this purchase order?",
-        message:
-          "You have unsaved changes. If you continue, your changes on this purchase order will be lost.",
-        stayText: "Stay",
-        leaveText: "Leave page",
-        onConfirm: () => navigate(href),
-      });
-      return;
-    }
-
-    navigate(href);
+  const openSampleRedirect = () => {
+    openRedirectWarning({
+      title: "Sample redirect confirmation",
+      message:
+        "This is a sample redirect confirmation. Clicking Confirm would normally redirect you elsewhere, but it won't in this single-page demo.",
+      stayText: "Cancel",
+      leaveText: "Confirm",
+      onConfirm: () => {
+        // Intentionally do nothing (demo)
+      },
+    });
   };
 
   const apiRef = useGridApiRef();
@@ -809,276 +844,270 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     renderEditCell: (params) => <EditableInputCellWithSave params={params} inputProps={inputProps} />,
   });
 
-  const variantTaxCol = {
-    ...LEFT,
-    field: "variantTax",
-    headerName: "Tax",
-    width: 120,
-    editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
-    valueGetter: (value) => Number(value ?? 0),
-    valueFormatter: (value) => `${Number(value ?? 0)}%`,
-    renderCell: (params) => <EditableDisplayCell params={params} />,
-    renderEditCell: (params) => (
-      <EditableInputCellWithSave
-        params={params}
-        inputProps={{
-          inputMode: "numeric",
-          pattern: "[0-9]*",
-          onWheel: (e) => e.currentTarget.blur(),
-          onBlur: (e) => {
-            const clamped = clampDecimalFromInput(e.target.value, { min: 0, max: 100, fallback: 0, places: 4 });
-            params.api.setEditCellValue({ id: params.id, field: params.field, value: clamped }, e);
-          },
-        }}
-      />
-    ),
-  };
+  const columns = useMemo(() => ([
+      {
+        ...LEFT,
+        headerName: "",
+        field: "actions",
+        type: "actions",
+        width: 25,
+        getActions: (params) => {
+          try {
+            if (tableRows.length === 0) return [];
+            return [
+              <GridActionsCellItem
+                key="delete-action"
+                icon={<DeleteIcon />}
+                onClick={() => handleDeleteClick(params.row.uid)}
+                label="Delete"
+                color="inherit"
+              />,
+            ];
+          } catch (error) {
+            return [];
+          }
+        },
+      },
+      {
+        ...LEFT,
+        field: "headerImage",
+        headerName: "Image",
+        width: 60,
+        renderCell: (params) => (
+          <img
+            src={params.value}
+            alt=""
+            style={{ width: 42, height: 42, borderRadius: 6, marginTop: "5px" }}
+          />
+        ),
+        sortable: false,
+        filterable: false,
+      },
+      {
+        ...LEFT,
+        field: "variantTitle",
+        headerName: "Title",
+        width: 280,
+        renderCell: (params) => {
+          const variantTitle = params.value || "—";
+          const productTitle = params.row?.productTitle || "";
 
-  const baseColumns = useMemo(() =>([
-    {
-      ...LEFT,
-      field: "headerImage",
-      headerName: "Image",
-      width: 60,
-      renderCell: (params) => (
-        <img src={params.value} alt="" style={{ width: 42, height: 42, borderRadius: 6, marginTop: "5px" }} />
-      ),
-      sortable: false,
-      filterable: false,
-    },
-    {
-      ...LEFT,
-      field: "variantTitle",
-      headerName: "Title",
-      width: 280,
-      renderCell: (params) => {
-        const variantTitle = params.value || "—";
-        const productTitle = params.row?.productTitle || "";
-        const productPk = params.row?.productPk;
-        const variantPk = params.row?.variantPk;
+          const showVariantChip =
+            !!variantTitle &&
+            variantTitle !== "—" &&
+            String(variantTitle).toLowerCase() !== "default title" &&
+            variantTitle !== productTitle;
 
-        const href =
-          productPk &&
-          variantPk &&
-          !params.row?.productDeleted &&
-          !params.row?.variantDeleted
-            ? `/products/${productPk}/variant/${variantPk}`
-            : null;
+          const handleClick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openSampleRedirect();
+          };
 
-        const showVariantChip =
-          !!variantTitle &&
-          variantTitle !== "—" &&
-          String(variantTitle).toLowerCase() !== "default title" &&
-          variantTitle !== productTitle;
+          if (showVariantChip) {
+            return (
+              <Box
+                role="button"
+                tabIndex={0}
+                onClick={handleClick}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") handleClick(e);
+                }}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  "&:hover": { textDecoration: "underline" },
+                }}
+              >
+                <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: "primary.main" }}>
+                  {productTitle || variantTitle}
+                </Typography>
 
-        if (showVariantChip) {
+                <Chip
+                  size="small"
+                  label={variantTitle}
+                  sx={{
+                    mt: 0.5,
+                    alignSelf: "flex-start",
+                    "& .MuiChip-label": {
+                      display: "inline-block",
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                      px: 0.75,
+                    },
+                  }}
+                />
+              </Box>
+            );
+          }
+
           return (
             <Box
-              component="a"
-              href={href}
+              role="button"
+              tabIndex={0}
+              onClick={handleClick}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") handleClick(e);
+              }}
               sx={{
                 display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-start",
-                overflow: "hidden",
-                "&:hover": { textDecoration: "underline" },
-              }}
-              onClick={(e) => {
-                if (href && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-                  tryNavigateWithWarning(e, href);
-                }
-              }}
-            >
-              <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: "primary.main" }}>
-                {productTitle || variantTitle}
-              </Typography>
-
-              <Chip
-                size="small"
-                label={variantTitle}
-                sx={{
-                  mt: 0.5,
-                  alignSelf: "flex-start",
-                  "& .MuiChip-label": {
-                    display: "inline-block",
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontSize: "0.75rem",
-                    color: "text.secondary",
-                    px: 0.75,
-                  },
-                }}
-              />
-            </Box>
-          );
-        }
-
-        return (
-          <Box sx={{ display: "flex", alignItems: "center", height: "100%", minWidth: 0 }}>
-            <Box
-              component="a"
-              href={href}
-              sx={{
-                cursor: href ? "pointer" : "default",
-                color: href ? "primary.main" : "text.primary",
+                alignItems: "center",
+                height: "100%",
+                minWidth: 0,
+                cursor: "pointer",
+                color: "primary.main",
                 fontWeight: 600,
                 textDecoration: "none",
-                "&:hover": { textDecoration: href ? "underline" : "none" },
+                "&:hover": { textDecoration: "underline" },
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
-              onClick={(e) => {
-                if (href && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-                  tryNavigateWithWarning(e, href);
-                }
-              }}
             >
               {productTitle || variantTitle || "—"}
             </Box>
-          </Box>
-        );
+          );
+        },
       },
-    },
 
-    { ...LEFT, field: "variantSku", headerName: "SKU", width: 160 },
+      { ...LEFT, field: "variantSku", headerName: "SKU", width: 160 },
 
-    {
-      ...LEFT,
-      field: "variantDescriptionPurchase",
-      headerName: "Purchase Description",
-      width: 260,
-      editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
-      renderCell: (params) => (
-        <Box
-          sx={{
-            width: "100%",
-            cursor: Number(params.row?.qtyReceived || 0) === 0 ? "pointer" : "default",
-          }}
-          onClick={(e) => {
-            // single click opens editor (optional)
-            if (Number(params.row?.qtyReceived || 0) !== 0) return;
-            e.stopPropagation();
-            openPurchDescEditor(params.row);
-          }}
-        >
-          <EditableDisplayCell params={params} />
-        </Box>
-      ),
-    },
-
-    {
-      ...LEFT,
-      field: "qtyOrdered",
-      headerName: "Qty Ordered",
-      width: 120,
-      editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
-      renderCell: (params) => <EditableDisplayCell params={params} />,
-      renderEditCell: (params) => (
-        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-          <Box sx={{ flex: 1 }}>{DigitsOnlyEditCell(params)}</Box>
-
-          <IconButton
-            size="small"
-            aria-label="Save"
-            onClick={(e) => {
-              e.stopPropagation();
-              params.api.stopCellEditMode({ id: params.id, field: params.field });
-            }}
-            sx={{ ml: 1 }}
-          >
-            <SaveOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      ),
-    },
-    {
-      ...LEFT,
-      field: "qtyOnHand",
-      headerName: "Qty On Hand",
-      width: 120,
-      valueGetter: (v) => Number(v ?? 0),
-    },
-    {
-      ...LEFT,
-      field: "qtyOnOrder",
-      headerName: "Qty On Order",
-      width: 120,
-      valueGetter: (v) => Number(v ?? 0),
-    },
-
-    withMobileIcons(
       {
         ...LEFT,
-        field: "cost",
-        headerName: "Cost",
+        field: "variantDescriptionPurchase",
+        headerName: "Purchase Description",
+        width: 260,
+        editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
+        renderCell: (params) => (
+          <Box
+            sx={{
+              width: "100%",
+              cursor: Number(params.row?.qtyReceived || 0) === 0 ? "pointer" : "default",
+            }}
+            onClick={(e) => {
+              if (Number(params.row?.qtyReceived || 0) !== 0) return;
+              e.stopPropagation();
+              openPurchDescEditor(params.row);
+            }}
+          >
+            <EditableDisplayCell params={params} />
+          </Box>
+        ),
+      },
+
+      {
+        ...LEFT,
+        field: "qtyOrdered",
+        headerName: "Qty Ordered",
         width: 120,
+        editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
+        renderCell: (params) => <EditableDisplayCell params={params} />,
+        renderEditCell: (params) => (
+          <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
+            <Box sx={{ flex: 1 }}>{DigitsOnlyEditCell(params)}</Box>
+
+            <IconButton
+              size="small"
+              aria-label="Save"
+              onClick={(e) => {
+                e.stopPropagation();
+                params.api.stopCellEditMode({ id: params.id, field: params.field });
+              }}
+              sx={{ ml: 1 }}
+            >
+              <SaveOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        ),
+      },
+
+      { ...LEFT, field: "qtyOnHand", headerName: "Qty On Hand", width: 120, valueGetter: (v) => Number(v ?? 0) },
+
+      withMobileIcons(
+        {
+          ...LEFT,
+          field: "cost",
+          headerName: "Cost",
+          width: 120,
+          valueGetter: (v) => Number(v ?? 0),
+          valueFormatter: (v) => `$${formatMoney(v ?? 0, 2)}`,
+          editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
+        },
+        {
+          inputProps: {
+            inputMode: "decimal",
+            maxLength: 24,
+            onBlur: (e) => {
+              const clamped = clampDecimalFromInput(e.target.value, {
+                min: 0,
+                max: PG_FLOAT4_MAX,
+                fallback: 0,
+                places: 4,
+              });
+              e.target.value = String(clamped);
+            },
+          },
+        }
+      ),
+
+      {
+        ...LEFT,
+        field: "variantTax",
+        headerName: "Tax",
+        width: 120,
+        editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
+        valueGetter: (value) => Number(value ?? 0),
+        valueFormatter: (value) => `${Number(value ?? 0)}%`,
+        renderCell: (params) => <EditableDisplayCell params={params} />,
+        renderEditCell: (params) => (
+          <EditableInputCellWithSave
+            params={params}
+            inputProps={{
+              inputMode: "numeric",
+              pattern: "[0-9]*",
+              onWheel: (e) => e.currentTarget.blur(),
+              onBlur: (e) => {
+                const clamped = clampDecimalFromInput(e.target.value, {
+                  min: 0,
+                  max: 100,
+                  fallback: 0,
+                  places: 4,
+                });
+                params.api.setEditCellValue(
+                  { id: params.id, field: params.field, value: clamped },
+                  e
+                );
+              },
+            }}
+          />
+        ),
+      },
+
+      {
+        ...LEFT,
+        field: "costExtended",
+        headerName: "Extended Cost",
+        width: 140,
         valueGetter: (v) => Number(v ?? 0),
         valueFormatter: (v) => `$${formatMoney(v ?? 0, 2)}`,
-        editable: (params) => Number(params.row?.qtyReceived || 0) === 0,
-      },
-      {
-        inputProps: {
-          inputMode: "decimal",
-          maxLength: 24,
-          onBlur: (e) => {
-            const clamped = clampDecimalFromInput(e.target.value, {
-              min: 0,
-              max: PG_FLOAT4_MAX,
-              fallback: 0,
-              places: 4,
-            });
-            e.target.value = String(clamped);
-          },
-        },
-      }
-    ),
-
-    variantTaxCol,
-
-    {
-      ...LEFT,
-      field: "costExtended",
-      headerName: "Extended Cost",
-      width: 140,
-      valueGetter: (v) => Number(v ?? 0),
-      valueFormatter: (v) => `$${formatMoney(v ?? 0, 2)}`,
-    },
-  ]), [
+      }, 
+    ]), 
+  [
     isMobile,
-    tableRows
+    tableRows.length, // better than entire tableRows array (keeps columns more stable)
+    formatMoney,
+    clampDecimalFromInput,
+    openPurchDescEditor,
+    openSampleRedirect,
+    handleDeleteClick,
   ]);
-
-  const editableDataGrid = useMemo(() => {
-    const actionsCol = {
-      ...LEFT,
-      headerName: "",
-      field: "actions",
-      type: "actions",
-      width: 25,
-      getActions: (params) => {
-        try {
-          if (tableRows.length === 0) return [];
-          
-          return [
-            <GridActionsCellItem
-              key="delete-action"
-              icon={<DeleteIcon />}
-              onClick={() => handleDeleteClick(params.row.uid)}
-              label="Delete"
-              color="inherit"
-            />,
-          ];
-        } catch (error) {
-          return [];
-        }
-      },
-    };
-
-    return [actionsCol, ...baseColumns];
-  }, [baseColumns, tableRows]);
 
   //Prevents form submission from pressing enter button.
   const handlePressEnter = (event) => {
@@ -1086,55 +1115,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   };
 
   const sectionBorder = darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-
-  // -----------------------------
-  // Totals / Summary (RESTORED)
-  // -----------------------------
-  const money = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const formatMoney = (value, decimals = 4) => {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return (0).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-
-    return n.toLocaleString(undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-  };
-
-  const tableSubtotal = useMemo(() => {
-    const rows = Array.isArray(tableRows) ? tableRows : [];
-    const sum = rows.reduce((acc, r) => {
-      // Prefer costExtended (what your grid writes), fall back to itemCostExtended if older data exists
-      const line = money(r?.costExtended ?? r?.itemCostExtended ?? 0);
-      return acc + line;
-    }, 0);
-
-    return roundTo(sum, 4);
-  }, [tableRows]);
-
-  const discountPercent = watch("discountPercent");
-  const discountAmount  = watch("discountAmount");
-  const freight         = watch("freight");
-  const fee             = watch("fee");
-  const tax             = watch("tax");
-
-  const summaryCalc = useMemo(() => {
-    const dp = money(discountPercent);
-    const da = money(discountAmount);
-    const fr = money(freight);
-    const fe = money(fee);
-    const tx = money(tax);
-
-    const percentDiscountValue = roundTo(tableSubtotal * (dp / 100), 4);
-    const netAdditional = roundTo(-percentDiscountValue - da + fr + fe + tx, 4);
-    const tableTotal = roundTo(tableSubtotal + netAdditional, 4);
-
-    return { dp, da, fr, fe, tx, percentDiscountValue, netAdditional, tableTotal };
-  }, [tableSubtotal, discountPercent, discountAmount, freight, fee, tax]);
 
   return (
     <Box className="page-responsive-width" sx={{ display: "flex", flexDirection: "column" }}>
@@ -1618,7 +1598,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               <DataGrid
                 apiRef={apiRef}
                 rows={tableRows}
-                columns={editableDataGrid}
+                columns={columns}
                 loading={rowsBeingAdded}
                 disableRowSelectionOnClick
                 getRowId={(row) => row.uid}
