@@ -428,9 +428,6 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
           },
         });
 
-        console.log(res);
-        
-
         const incoming = res?.data?.products || [];
         const more = !!res?.data?.hasMoreProducts;
 
