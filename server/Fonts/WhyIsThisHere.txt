@@ -1,0 +1,3 @@
+This fonts folder exists because the Export PO to PDF function does not support Cyrillic characters.
+Arial font supports both Cyrillic and Latin characters.
+Also, if we ever need to change fonts that are compatible with Cyrillic, we can put them here.

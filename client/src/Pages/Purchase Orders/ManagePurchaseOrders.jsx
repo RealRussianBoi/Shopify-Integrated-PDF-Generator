@@ -197,6 +197,60 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   });
 
   // -----------------------------
+  // Totals / Summary
+  // -----------------------------
+  const money = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const formatMoney = (value, decimals = 4) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return (0).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+    return n.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  };
+
+  const roundTo = (n, places = 4) => {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return 0;
+    const p = 10 ** places;
+    return Math.round(x * p) / p;
+  };
+
+  const tableSubtotal = useMemo(() => {
+    const rows = Array.isArray(tableRows) ? tableRows : [];
+    const sum = rows.reduce((acc, r) => {
+      // Prefer costExtended (what your grid writes), fall back to itemCostExtended if older data exists
+      const line = money(r?.costExtended ?? r?.itemCostExtended ?? 0);
+      return acc + line;
+    }, 0);
+
+    return roundTo(sum, 4);
+  }, [tableRows]);
+
+  const discountPercent = watch("discountPercent");
+  const discountAmount  = watch("discountAmount");
+  const freight         = watch("freight");
+  const fee             = watch("fee");
+
+  const summaryCalc = useMemo(() => {
+    const dp = money(discountPercent);
+    const da = money(discountAmount);
+    const fr = money(freight);
+    const fe = money(fee);
+
+    const percentDiscountValue = roundTo(tableSubtotal * (dp / 100), 4);
+    const netAdditional = roundTo(-percentDiscountValue - da + fr + fe, 4);
+    const tableTotal = roundTo(tableSubtotal + netAdditional, 4);
+
+    return { dp, da, fr, fe, percentDiscountValue, netAdditional, tableTotal };
+  }, [tableSubtotal, discountPercent, discountAmount, freight, fee]);
+
+  // -----------------------------
   // Confirmation dialog controller (RedirectWarning)
   // -----------------------------
   const confirmActionRef = useRef(null);
@@ -300,13 +354,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
   const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
-  const roundTo = (n, places = 4) => {
-    const x = Number(n);
-    if (!Number.isFinite(x)) return 0;
-    const p = 10 ** places;
-    return Math.round(x * p) / p;
-  };
-
   const extractInt = (value) => {
     if (value === null || value === undefined) return NaN;
     const str = String(value).trim();
@@ -345,7 +392,26 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     return s.length > maxLen ? s.slice(0, maxLen) : s;
   };
 
-  const validateCreatePO = (formData) => {
+  const handleResetFields = useCallback(() => {
+    reset(defaultValues);
+    setTableRows([]);
+    clearErrors();
+  }, [reset, defaultValues, clearErrors]);
+
+  const validateCreatePO = useCallback(async () => {
+    setFinalDialog((prev) => ({
+      ...prev,
+      open: true,
+      loadingText: "Saving Purchase Order...",
+      severity: "info",
+      severityText: "",
+    }));
+
+    // Give React time to render dialog before heavy work
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    
+    const formData = getValues();
+
     const headerIssues = [];
     const rowIssues = [];
 
@@ -353,92 +419,47 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     const destinationPk = String(formData?.destinationPk ?? "").trim();
     const poNumber = String(formData?.poNumber ?? "").trim();
 
-    // -----------------------------
-    // Header requirements
-    // -----------------------------
     if (!vendorPk) {
       headerIssues.push("Vendor is required.");
       setError("vendorPk", { type: "manual", message: "Vendor is required." });
+    } else {
+      clearErrors("vendorPk");
     }
 
     if (!destinationPk) {
       headerIssues.push("Destination is required.");
       setError("destinationPk", { type: "manual", message: "Destination is required." });
+    } else {
+      clearErrors("destinationPk");
     }
 
     if (!poNumber) {
       headerIssues.push("PO Number is required.");
       setError("poNumber", { type: "manual", message: "PO Number is required." });
+    } else {
+      clearErrors("poNumber");
     }
 
-    // -----------------------------
-    // Date requirements (Create PO only)
-    // -----------------------------
-    const toDate = (v) => (v instanceof Date && !isNaN(v) ? v : v ? new Date(v) : null);
-    const strip = (d) => {
-      if (!d || Number.isNaN(d.getTime())) return null;
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
-    };
-
-    const todayLocal = new Date();
-    todayLocal.setHours(0, 0, 0, 0);
-
-    const due = strip(toDate(formData?.dueDate));
-    const ship = strip(toDate(formData?.dateToShip));
-    const voidD = strip(toDate(formData?.dateVoid));
-
-    if (due && due < todayLocal) {
-      headerIssues.push("Due Date must be today or later.");
-      setError("dueDate", { type: "manual", message: "Due Date must be today or later." });
-    }
-
-    if (ship && ship < todayLocal) {
-      headerIssues.push("Date To Ship must be today or later.");
-      setError("dateToShip", { type: "manual", message: "Date To Ship must be today or later." });
-    }
-
-    if (voidD && voidD < todayLocal) {
-      headerIssues.push("Date Void must be today or later.");
-      setError("dateVoid", { type: "manual", message: "Date Void must be today or later." });
-    }
-
-    // -----------------------------
-    // Rows (allow empty; only validate if any exist)
-    // -----------------------------
     const rows = Array.isArray(tableRows) ? tableRows : [];
 
-    if (rows.length > 0) {
+    if (rows.length === 0) {
+      rowIssues.push("Add at least one product to the PO.");
+    } else {
       rows.forEach((r) => {
         const uid = r?.uid ?? "?";
-
         const desc = String(r?.variantDescriptionPurchase ?? "").trim();
         if (!desc) rowIssues.push(`Row ${uid}: Purchase Description is required.`);
-
-        const qty = clampIntFromInput(r?.qtyOrdered, { min: 1, max: PG_INT_MAX, fallback: NaN });
-        if (!Number.isFinite(qty) || qty < 1) rowIssues.push(`Row ${uid}: Qty Ordered must be at least 1.`);
-
-        const cost = clampDecimalFromInput(r?.cost, { min: 0, max: PG_FLOAT4_MAX, fallback: NaN, places: 4 });
-        if (!Number.isFinite(cost) || cost < 0) rowIssues.push(`Row ${uid}: Cost must be 0 or greater.`);
       });
     }
 
     const uniqueRowIssues = [...new Set(rowIssues)];
 
-    // ✅ rows field error = rows only
     if (uniqueRowIssues.length) {
-      setError("rows", {
-        type: "manual",
-        message: `Fix the following rows before creating a PO:\n• ${uniqueRowIssues.slice(0, 8).join("\n• ")}${
-          uniqueRowIssues.length > 8 ? `\n• (+${uniqueRowIssues.length - 8} more)` : ""
-        }`,
-      });
+      setError("rows", { type: "manual", message: uniqueRowIssues.join("\n") });
     } else {
       clearErrors("rows");
     }
 
-    // Any issues => fail (dialog can show both)
     const allIssues = [...headerIssues, ...uniqueRowIssues];
 
     if (allIssues.length) {
@@ -448,27 +469,31 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
         severity: "error",
         loadingText: "",
         severityText: (
-          <>
-            <Typography sx={{ fontWeight: 700, mb: 1 }}>
-              Cannot create PO. Fix:
-            </Typography>
+          <Box
+            sx={{
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 0.75,
+            }}
+          >
+            <Typography sx={{ fontWeight: 800 }}>Cannot export PDF. Fix:</Typography>
 
-            <Box component="ul" sx={{ m: 0, pl: 2 }}>
+            <Box sx={{ width: "100%", maxWidth: 520 }}>
               {allIssues.slice(0, 8).map((msg, i) => (
-                <li key={i}>
-                  <Typography variant="body2">{msg}</Typography>
-                </li>
+                <Typography key={i} variant="body2" sx={{ lineHeight: 1.4 }}>
+                  {msg}
+                </Typography>
               ))}
 
               {allIssues.length > 8 && (
-                <li>
-                  <Typography variant="body2">
-                    (+{allIssues.length - 8} more)
-                  </Typography>
-                </li>
+                <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 700 }}>
+                  (+{allIssues.length - 8} more)
+                </Typography>
               )}
             </Box>
-          </>
+          </Box>
         ),
       }));
 
@@ -476,7 +501,141 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     }
 
     return true;
-  };
+  }, [getValues, tableRows, setError, clearErrors, setFinalDialog]);
+
+  const handleExportToPdf = useCallback(async () => {
+    const ok = validateCreatePO();
+    if (!ok) return;
+
+    const formData = getValues();
+
+    const vendor =
+      vendorsList.find((v) => String(v.pk) === String(formData.vendorPk)) || null;
+
+    const destination =
+      destinationsList.find((d) => String(d.pk) === String(formData.destinationPk)) || null;
+
+    const payload = {
+      poNumber: String(formData.poNumber || "").trim(),
+      dates: {
+        dateToShip: formData.dateToShip ? new Date(formData.dateToShip).toISOString() : null,
+        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+        dateVoid: formData.dateVoid ? new Date(formData.dateVoid).toISOString() : null,
+
+        paymentTerms: String(formData.paymentTerms || "").trim(),
+        shippingCarrier: String(formData.shippingCarrier || "").trim(),
+        trackingNumber: String(formData.trackingNumber || "").trim(),
+      },
+
+      billingAddress: {
+        companyName: "Summit Snowboards",
+        line1: "123 Demo St",
+        line2: "",
+        city: "New York",
+        region: "NY",
+        postal_code: "10001",
+        country_code: "US",
+        phone: "555-555-5555",
+        email: "demo@syncbooks.com",
+        website: "syncbooks.example",
+      },
+
+      shippingAddress: destination
+        ? {
+            line1: destination.addressLine1 || "",
+            line2: destination.addressLine2 || "",
+            city: destination.addressCity || "",
+            region: destination.addressRegion || "",
+            postal_code: destination.addressPostalCode || "",
+            country_code: destination.addressCountryCode || "US",
+            phone: destination.phone || "",
+            email: destination.email || "",
+          }
+        : null,
+
+      vendor: vendor
+        ? {
+            pk: vendor.pk,
+            name: vendor.name || "",
+            address: vendor.address || "",
+            aptSuite: vendor.aptSuite || "",
+            city: vendor.city || "",
+            state: vendor.state || "",
+            zipCode: vendor.zipCode || "",
+            country: vendor.country || "",
+            phoneNumber1: vendor.phoneNumber1 || "",
+            email1: vendor.email1 || "",
+          }
+        : null,
+
+      rows: (Array.isArray(tableRows) ? tableRows : []).map((r) => ({
+        uid: r.uid,
+        headerImage: r.headerImage,
+        variantSku: r.variantSku,
+        variantDescriptionPurchase: r.variantDescriptionPurchase,
+        qtyOrdered: r.qtyOrdered,
+        cost: r.cost,
+        variantTax: r.variantTax,
+      })),
+
+      summary: {
+        subtotal: tableSubtotal,
+        shipping: Number(getValues("freight") || 0),
+        total: summaryCalc.tableTotal,
+      },
+    };
+
+    try {
+      const res = await axios.post(
+        "http://localhost:4000/purchase-order/export/pdf",
+        payload,
+        { responseType: "blob" }
+      );
+    
+      const disposition = res.headers?.["content-disposition"] || "";
+      const match = /filename\*?=(?:UTF-8''|")?([^;"\n]+)/i.exec(disposition);
+      const filenameFromHeader = match ? decodeURIComponent(match[1].replace(/"/g, "")) : null;
+    
+      const fallbackName = `Purchase Order ${payload.poNumber || "export"}.pdf`;
+      const filename = filenameFromHeader || fallbackName;
+    
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+    
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    
+      window.URL.revokeObjectURL(url);
+
+      setFinalDialog((prev) => ({
+        ...prev,
+        open: true,
+        severity: "success",
+        severityText: "Purchase Order saved successfully!",
+      }));
+    } catch (error) {
+      console.error("Error exporting purchase order PDF:", error);
+
+      setFinalDialog((prev) => ({
+        ...prev,
+        open: true,
+        severity: "warning",
+        severityText: `An error occurred while exporting the PDF. Please try again.\n\nError details: ${error.message}`,
+      }));
+    }
+  }, [
+    validateCreatePO,
+    getValues,
+    vendorsList,
+    destinationsList,
+    tableRows,
+    tableSubtotal,
+    summaryCalc.tableTotal,
+  ]);
 
   // -----------------------------
   // Initial data fetch
@@ -532,19 +691,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     fetchInitialData();
   }, [reset]);
 
-  // Navbar Actions (Reset + Export)
-  const handleResetFields = () => {
-    reset(defaultValues);
-    setTableRows([]);
-    clearErrors(); // optional: clears header + rows errors
-  };
-
-  const handleExportToPdf = () => {
-    // Simple baseline (works without extra deps):
-    // You can replace this with your real PDF export later (html2canvas/jspdf/etc.)
-    window.print();
-  };
-
   //Sets Navbar Actions
   useEffect(() => {
     setNavbarActions(
@@ -588,57 +734,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   }, [
     setNavbarActions,
     finalizationController.disableFields,
-    reset,
+    validateCreatePO,
   ]);
-
-  // -----------------------------
-  // Totals / Summary
-  // -----------------------------
-  const money = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const formatMoney = (value, decimals = 4) => {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return (0).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-
-    return n.toLocaleString(undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-  };
-
-  const tableSubtotal = useMemo(() => {
-    const rows = Array.isArray(tableRows) ? tableRows : [];
-    const sum = rows.reduce((acc, r) => {
-      // Prefer costExtended (what your grid writes), fall back to itemCostExtended if older data exists
-      const line = money(r?.costExtended ?? r?.itemCostExtended ?? 0);
-      return acc + line;
-    }, 0);
-
-    return roundTo(sum, 4);
-  }, [tableRows]);
-
-  const discountPercent = watch("discountPercent");
-  const discountAmount  = watch("discountAmount");
-  const freight         = watch("freight");
-  const fee             = watch("fee");
-  const tax             = watch("tax");
-
-  const summaryCalc = useMemo(() => {
-    const dp = money(discountPercent);
-    const da = money(discountAmount);
-    const fr = money(freight);
-    const fe = money(fee);
-    const tx = money(tax);
-
-    const percentDiscountValue = roundTo(tableSubtotal * (dp / 100), 4);
-    const netAdditional = roundTo(-percentDiscountValue - da + fr + fe + tx, 4);
-    const tableTotal = roundTo(tableSubtotal + netAdditional, 4);
-
-    return { dp, da, fr, fe, tx, percentDiscountValue, netAdditional, tableTotal };
-  }, [tableSubtotal, discountPercent, discountAmount, freight, fee, tax]);
 
   // -----------------------------
   // UI helpers (unchanged)
@@ -672,6 +769,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
       const updatedRows = handleUidAssign([...(Array.isArray(tableRows) ? tableRows : []), ...items]);
       setTableRows(updatedRows);
+      clearErrors("rows");
     } catch (error) {
       console.error(`Error fetching selected variants to add to purchase order:\n\n${error.message}`);
       throw error;
@@ -708,6 +806,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     if (idx >= 0 && idx < next.length) next[idx] = updatedRow;
 
     setTableRows(next);
+    clearErrors("rows");
     return updatedRow;
   };
 
@@ -1020,7 +1119,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
         align: "left",
         headerAlign: "left",
         field: "qtyOnHand",
-        headerName: "Qty On Hand",
+        headerName: "Qty Available",
         width: 120,
         valueGetter: (v) => Number(v ?? 0)
       },
@@ -1104,9 +1203,9 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   ]);
 
   //Prevents form submission from pressing enter button.
-  const handlePressEnter = (event) => {
+  const handlePressEnter = useCallback((event) => {
     if (event.key === "Enter") event.preventDefault();
-  };
+  }, []);
 
   return (
     <Box className="page-responsive-width" sx={{ display: "flex", flexDirection: "column" }}>
@@ -1153,7 +1252,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               <Controller
                 name="poNumber"
                 control={control}
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <TextField
                     {...field}
                     fullWidth
@@ -1161,10 +1260,10 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                     variant="outlined"
                     disabled={finalizationController.disableFields}
                     value={field.value ?? ""}
-                    error={!!errors.poNumber}
-                    helperText={errors.poNumber?.message || ""}
+                    error={!!fieldState.error}
+                    helperText={fieldState.error?.message || ""}
                     onChange={(e) => {
-                      if (errors.poNumber) clearErrors("poNumber");
+                      if (fieldState.error) clearErrors("poNumber");
                       field.onChange(e.target.value);
                     }}
                   />
@@ -1297,8 +1396,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                     name="vendorPk"
                     control={control}
                     rules={{ required: "Vendor is required" }}
-                    render={({ field }) => (
-                      <FormControl fullWidth error={!!errors.vendorPk}>
+                    render={({ field, fieldState }) => (
+                      <FormControl fullWidth error={!!fieldState.error}>
                         <Select
                           {...field}
                           displayEmpty
@@ -1312,7 +1411,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                               return;
                             }
 
-                            if (errors.vendorPk) clearErrors("vendorPk");
+                            if (fieldState.error) clearErrors("vendorPk");
                             field.onChange(val);
                           }}
                           renderValue={(value) => {
@@ -1365,8 +1464,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           })}
                         </Select>
 
-                        {!!errors.vendorPk && (
-                          <FormHelperText>{errors.vendorPk.message}</FormHelperText>
+                        {!!fieldState.error && (
+                          <FormHelperText>{fieldState.error.message}</FormHelperText>
                         )}
                       </FormControl>
                     )}
@@ -1390,8 +1489,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                     name="destinationPk"
                     control={control}
                     rules={{ required: "Destination is required" }}
-                    render={({ field }) => (
-                      <FormControl fullWidth error={!!errors.destinationPk}>
+                    render={({ field, fieldState }) => (
+                      <FormControl fullWidth error={!!fieldState.error}>
                         <Select
                           {...field}
                           displayEmpty
@@ -1401,6 +1500,10 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                             if (!value) return "Select destination";
                             const d = destinationsList.find((x) => String(x.pk) === String(value));
                             return d?.name || "Select destination";
+                          }}
+                          onChange={(e) => {
+                            field.onChange(e.target.value);
+                            if (fieldState.error) clearErrors("destinationPk");
                           }}
                         >
                           <MenuItem value="">
@@ -1450,8 +1553,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           })}
                         </Select>
 
-                        {!!errors.destinationPk && (
-                          <FormHelperText>{errors.destinationPk.message}</FormHelperText>
+                        {!!fieldState.error && (
+                          <FormHelperText>{fieldState.error.message}</FormHelperText>
                         )}
                       </FormControl>
                     )}
@@ -1495,12 +1598,11 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                     name="vendorCurrency"
                     control={control}
                     rules={{ required: "Currency is required" }}
-                    render={({ field }) => {
-                      const selected =
-                        WORLD_CURRENCIES.find((c) => c.value === field.value) || null;
+                    render={({ field, fieldState }) => {
+                      const selected = WORLD_CURRENCIES.find((c) => c.value === field.value) || null;
 
                       return (
-                        <FormControl fullWidth error={!!errors.vendorCurrency}>
+                        <FormControl fullWidth error={!!fieldState.error}>
                           <Autocomplete
                             options={WORLD_CURRENCIES}
                             value={selected}
@@ -1509,16 +1611,14 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                             getOptionLabel={(option) =>
                               option?.label ? `${option.label} (${option.value})` : ""
                             }
-                            isOptionEqualToValue={(option, value) =>
-                              option.value === value.value
-                            }
+                            isOptionEqualToValue={(option, value) => option.value === value.value}
                             renderInput={(params) => (
                               <TextField
                                 {...params}
                                 variant="outlined"
                                 placeholder="Select currency"
-                                error={!!errors.vendorCurrency}
-                                helperText={errors.vendorCurrency?.message}
+                                error={!!fieldState.error}
+                                helperText={fieldState.error?.message || ""}
                               />
                             )}
                           />
@@ -1688,13 +1788,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
             <PriceAugmentComponent
               control={control}
               setValue={setValue}
-              getValues={getValues}
-              trigger={trigger}
-              watch={watch}
-              rowsToMonitor={tableRows}
-              paramToMonitor="costExtended"
               everythingDisabled={finalizationController.disableFields}
-              isMobile={isMobile}
               defaultValues={{
                 discountPercent: defaultValues.discountPercent,
                 discountAmount: defaultValues.discountAmount,

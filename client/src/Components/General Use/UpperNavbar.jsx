@@ -13,10 +13,9 @@ const COLORS = {
   text: "#ffffff",
 };
 
-function UpperNavbar({ userData, reference = null, actions }) {
+function UpperNavbar({ actions }) {
   return (
     <AppBar
-      ref={reference}
       position="fixed"
       sx={{
         bgcolor: COLORS.drawerBg,
