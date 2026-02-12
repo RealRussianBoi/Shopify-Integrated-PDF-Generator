@@ -1125,6 +1125,9 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
     );
   }, [sectionBg]);
 
+  const rafRef = useRef(null);
+  const pendingStartIndexRef = useRef(0);
+  
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" fullScreen={isLgDown || forceFullScreen}>
       <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1175,9 +1178,18 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
                       rowRenderer={rowRenderer}
                       overscanRowCount={10}
                       onRowsRendered={({ startIndex }) => {
-                        setFirstVisibleIndex(startIndex);
-                        const pk = findStickyProductPkFromStartIndex(startIndex);
-                        setStickyProductPk(pk);
+                        pendingStartIndexRef.current = startIndex;
+
+                        if (rafRef.current) return;
+                        rafRef.current = requestAnimationFrame(() => {
+                          rafRef.current = null;
+
+                          const si = pendingStartIndexRef.current;
+                          setFirstVisibleIndex((prev) => (prev === si ? prev : si));
+
+                          const pk = findStickyProductPkFromStartIndex(si);
+                          setStickyProductPk((prev) => (prev === pk ? prev : pk));
+                        });
                       }}
                     />
                   )}

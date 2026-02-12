@@ -1,26 +1,21 @@
 //General use imports.
 import axios from "axios";
 import PropTypes from "prop-types";
-import { useContext, useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
 
 //MUI imports.
 import { Alert, Autocomplete, Box, Button, Chip,
   Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, FormHelperText, Grid, IconButton, InputAdornment,
-  MenuItem, Select, Snackbar, TextField, Typography, 
+  FormControl, FormHelperText, Grid, IconButton,
+  MenuItem, Select, TextField, Typography, 
   useMediaQuery as useMuiMediaQuery, useTheme as useMuiTheme, } from "@mui/material";
-import CachedRoundedIcon from "@mui/icons-material/CachedRounded";
 import DeleteIcon from "@mui/icons-material/Delete";
-import QuestionMarkIcon from "@mui/icons-material/QuestionMark";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { DataGrid, GridActionsCellItem, useGridApiRef, GridEditInputCell, } from "@mui/x-data-grid";
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import CloseIcon from "@mui/icons-material/Close";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 
 //Custom components.
@@ -47,8 +42,6 @@ const MAX_REFERENCE = 255;
 
 function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   const { darkMode } = useTheme();
-
-  const navigate = useNavigate();
 
   const muiTheme = useMuiTheme();
   const isMobile = useMuiMediaQuery(muiTheme.breakpoints.down("md"));
@@ -158,11 +151,9 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     return d;
   }, []);
 
-  const [dueDateWatch, dateToShipWatch, dateVoidWatch] = watch([
-    "dueDate",
-    "dateToShip",
-    "dateVoid",
-  ]);
+  const dueDateWatch = watch("dueDate");
+  const dateToShipWatch = watch("dateToShip");
+  const dateVoidWatch = watch("dateVoid");
 
   const shipmentDateWarnings = useMemo(() => {
     const warnings = [];
@@ -194,7 +185,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
     return warnings;
   }, [dueDateWatch, dateToShipWatch, dateVoidWatch, warningFutureDate]);
-
+  
   // -----------------------------
   // Purchase Description "Dialog" editor
   // -----------------------------
@@ -257,9 +248,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   const openPurchDescEditor = (row) => {
     const uid = row?.uid ?? null;
 
-    // Baseline to reset to:
-    // - prefer a dedicated baseline if you have it (recommended)
-    // - fallback to current value at open time
     const baseline =
       String(row?.variantDescriptionPurchaseBaseline ?? row?.variantDescriptionPurchase ?? "").trim();
 
@@ -546,7 +534,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
   // Navbar Actions (Reset + Export)
   const handleResetFields = () => {
-    // Reset form + clear rows back to your defaults
     reset(defaultValues);
     setTableRows([]);
     clearErrors(); // optional: clears header + rows errors
@@ -558,6 +545,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     window.print();
   };
 
+  //Sets Navbar Actions
   useEffect(() => {
     setNavbarActions(
       <Box
@@ -570,15 +558,13 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
           border: "1px solid",
           borderColor: "divider",
           borderRadius: 2,
-          width: isMobile ? "100%" : "auto",
-          maxWidth: isMobile ? 560 : "none",
+          width: "auto",
         }}
       >
         <Button
           variant="outlined"
           color="inherit"
           type="button"
-          fullWidth={isMobile}
           disabled={finalizationController.disableFields}
           onClick={handleResetFields}
         >
@@ -589,7 +575,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
           variant="contained"
           color="secondary"
           type="button"
-          fullWidth={isMobile}
           disabled={finalizationController.disableFields}
           startIcon={<FileDownloadIcon />}
           onClick={handleExportToPdf}
@@ -602,11 +587,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     return () => setNavbarActions(null);
   }, [
     setNavbarActions,
-    isMobile,
     finalizationController.disableFields,
     reset,
-    defaultValues,
-    clearErrors,
   ]);
 
   // -----------------------------
@@ -729,15 +711,13 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     return updatedRow;
   };
 
-  const handleDeleteClick = (uid) => {
+  const handleDeleteClick = useCallback((uid) => {
     setTableRows((prev) => {
       const updatedRows = [...prev];
       updatedRows.splice(uid - 1, 1);
       return handleUidAssign(updatedRows);
     });
-  };
-
-  const LEFT = { align: "left", headerAlign: "left" };
+  }, []);
 
   const openSampleRedirect = () => {
     openRedirectWarning({
@@ -846,30 +826,25 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
   const columns = useMemo(() => ([
       {
-        ...LEFT,
+        align: "left", 
+        headerAlign: "left",
         headerName: "",
         field: "actions",
         type: "actions",
         width: 25,
-        getActions: (params) => {
-          try {
-            if (tableRows.length === 0) return [];
-            return [
-              <GridActionsCellItem
-                key="delete-action"
-                icon={<DeleteIcon />}
-                onClick={() => handleDeleteClick(params.row.uid)}
-                label="Delete"
-                color="inherit"
-              />,
-            ];
-          } catch (error) {
-            return [];
-          }
-        },
+        getActions: (params) => (
+          <GridActionsCellItem
+            key="delete-action"
+            icon={<DeleteIcon />}
+            onClick={() => handleDeleteClick(params.row.uid)}
+            label="Delete"
+            color="inherit"
+          />
+        )
       },
       {
-        ...LEFT,
+        align: "left", 
+        headerAlign: "left",
         field: "headerImage",
         headerName: "Image",
         width: 60,
@@ -884,7 +859,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
         filterable: false,
       },
       {
-        ...LEFT,
+        align: "left", 
+        headerAlign: "left",
         field: "variantTitle",
         headerName: "Title",
         width: 280,
@@ -977,10 +953,21 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
         },
       },
 
-      { ...LEFT, field: "variantSku", headerName: "SKU", width: 160 },
+      {
+        align: "left", 
+        headerAlign: "left",
+        field: "variantSku",
+        headerName: "SKU",
+        width: 160,
+        renderCell: (params) => {
+          const sku = String(params.value || "").trim();
+          return sku ? sku : "—";
+        },
+      },
 
       {
-        ...LEFT,
+        align: "left", 
+        headerAlign: "left",
         field: "variantDescriptionPurchase",
         headerName: "Purchase Description",
         width: 260,
@@ -1003,7 +990,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
       },
 
       {
-        ...LEFT,
+        align: "left", 
+        headerAlign: "left",
         field: "qtyOrdered",
         headerName: "Qty Ordered",
         width: 120,
@@ -1028,11 +1016,19 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
         ),
       },
 
-      { ...LEFT, field: "qtyOnHand", headerName: "Qty On Hand", width: 120, valueGetter: (v) => Number(v ?? 0) },
+      {
+        align: "left",
+        headerAlign: "left",
+        field: "qtyOnHand",
+        headerName: "Qty On Hand",
+        width: 120,
+        valueGetter: (v) => Number(v ?? 0)
+      },
 
       withMobileIcons(
         {
-          ...LEFT,
+          align: "left", 
+          headerAlign: "left",
           field: "cost",
           headerName: "Cost",
           width: 120,
@@ -1058,7 +1054,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
       ),
 
       {
-        ...LEFT,
+        align: "left", 
+        headerAlign: "left",
         field: "variantTax",
         headerName: "Tax",
         width: 120,
@@ -1091,7 +1088,8 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
       },
 
       {
-        ...LEFT,
+        align: "left", 
+        headerAlign: "left",
         field: "costExtended",
         headerName: "Extended Cost",
         width: 140,
@@ -1102,10 +1100,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   [
     isMobile,
     tableRows.length, // better than entire tableRows array (keeps columns more stable)
-    formatMoney,
-    clampDecimalFromInput,
-    openPurchDescEditor,
-    openSampleRedirect,
     handleDeleteClick,
   ]);
 
@@ -1113,8 +1107,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
   const handlePressEnter = (event) => {
     if (event.key === "Enter") event.preventDefault();
   };
-
-  const sectionBorder = darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
 
   return (
     <Box className="page-responsive-width" sx={{ display: "flex", flexDirection: "column" }}>
@@ -1125,15 +1117,15 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
         finalResultText={finalizationController.finalResultText}
       />
 
-      <form id="poForm" noValidate autoComplete="off" onKeyDown={handlePressEnter}>
+      <form id="poForm" noValidate onKeyDown={handlePressEnter}>
         <Box
           sx={{
             "& > *": {
-              backgroundColor: darkMode ? "#1e1e1e" : "#fff",
+              bgcolor: "background.paper",
               borderRadius: 2,
               padding: 2,
               border: "1px solid",
-              borderColor: sectionBorder,
+              borderColor: "rgba(118, 118, 118, 0.57)",
             },
             display: "flex",
             flexDirection: "column",
@@ -1148,10 +1140,10 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               sx={{
                 mt: 1,
                 border: "1px solid",
-                borderColor: sectionBorder,
+                borderColor: "rgba(118, 118, 118, 0.57)",
                 borderRadius: 2,
                 p: 2,
-                backgroundColor: darkMode ? "#1e1e1e" : "#fff",
+                bgcolor: "background.paper",
               }}
             >
               <Typography variant="body2" sx={{ mb: 1 }} color="text.secondary">
@@ -1185,10 +1177,10 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               sx={{
                 mt: 2,
                 border: "1px solid",
-                borderColor: sectionBorder,
+                borderColor: "rgba(118, 118, 118, 0.57)",
                 borderRadius: 2,
                 p: 2,
-                backgroundColor: darkMode ? "#1e1e1e" : "#fff",
+                bgcolor: "background.paper",
               }}
             >
               <Typography variant="body2" sx={{ mb: 1 }} color="text.secondary">
@@ -1196,74 +1188,61 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               </Typography>
 
               <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <Controller
-                    name="dueDate"
-                    control={control}
-                    render={({ field }) => (
-                      <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Controller
+                      name="dueDate"
+                      control={control}
+                      render={({ field }) => (
                         <DatePicker
                           {...field}
                           label="Due Date"
                           disabled={finalizationController.disableFields}
                           minDate={today}
                           slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              size: "small",
-                            }
+                            textField: { fullWidth: true, size: "small" },
                           }}
                         />
-                      </LocalizationProvider>
-                    )}
-                  />
-                </Grid>
+                      )}
+                    />
+                  </Grid>
 
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <Controller
-                    name="dateToShip"
-                    control={control}
-                    render={({ field }) => (
-                      <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Controller
+                      name="dateToShip"
+                      control={control}
+                      render={({ field }) => (
                         <DatePicker
                           {...field}
                           label="Date To Ship"
                           disabled={finalizationController.disableFields}
                           minDate={today}
                           slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              size: "small",
-                            }
+                            textField: { fullWidth: true, size: "small" },
                           }}
                         />
-                      </LocalizationProvider>
-                    )}
-                  />
-                </Grid>
+                      )}
+                    />
+                  </Grid>
 
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <Controller
-                    name="dateVoid"
-                    control={control}
-                    render={({ field }) => (
-                      <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Controller
+                      name="dateVoid"
+                      control={control}
+                      render={({ field }) => (
                         <DatePicker
                           {...field}
                           label="Date Void"
                           disabled={finalizationController.disableFields}
                           minDate={today}
                           slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              size: "small",
-                            }
+                            textField: { fullWidth: true, size: "small" },
                           }}
                         />
-                      </LocalizationProvider>
-                    )}
-                  />
-                </Grid>
+                      )}
+                    />
+                  </Grid>
+                </LocalizationProvider>
               </Grid>
 
               {shipmentDateWarnings.length > 0 && (
@@ -1294,10 +1273,10 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               sx={{
                 mt: 1,
                 border: "1px solid",
-                borderColor: sectionBorder,
+                borderColor: "rgba(118, 118, 118, 0.57)",
                 borderRadius: 2,
                 overflow: "hidden",
-                backgroundColor: darkMode ? "#1e1e1e" : "#fff",
+                bgcolor: "background.paper",
               }}
             >
               <Grid container>
@@ -1307,7 +1286,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                   sx={{
                     p: 2,
                     borderBottom: "1px solid",
-                    borderColor: sectionBorder,
+                    borderColor: "rgba(118, 118, 118, 0.57)",
                   }}
                 >
                   <Typography variant="body2" sx={{ mb: 1 }} color="text.secondary">
@@ -1368,7 +1347,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                   sx={{
                     p: 2,
                     borderBottom: "1px solid",
-                    borderColor: sectionBorder,
+                    borderColor: "rgba(118, 118, 118, 0.57)",
                   }}
                 >
                   <Typography variant="body2" sx={{ mb: 1 }} color="text.secondary">
@@ -1462,13 +1441,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           {...field}
                           displayEmpty
                           disabled={finalizationController.disableFields}
-                          renderValue={(value) => {
-                            const found = paymentTermsList.find(
-                              (x) => String(x.value) === String(value)
-                            );
-                            return found?.label || "None";
-                          }}
-                          sx={{ "& .MuiSelect-select": { py: 1.25 } }}
                         >
                           {paymentTermsList.map((pt) => (
                             <MenuItem key={pt.value} value={pt.value}>
@@ -1590,7 +1562,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                 bgcolor: darkMode ? "#1e1e1e" : "#fff",
                 borderRadius: 2,
                 border: "1px solid",
-                borderColor: !!errors.rows ? "error.main" : sectionBorder,
+                borderColor: !!errors.rows ? "error.main" : "rgba(118, 118, 118, 0.57)",
                 height: "700px",
                 overflow: "auto",
               }}
@@ -1707,11 +1679,11 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               <Grid size={{ xs: 12, md: 6 }}>
                 <Box
                   sx={{
-                    backgroundColor: darkMode ? "#1e1e1e" : "#fff",
+                    bgcolor: "background.paper",
                     borderRadius: 2,
                     padding: 2,
                     border: "1px solid",
-                    borderColor: sectionBorder,
+                    borderColor: "rgba(118, 118, 118, 0.57)",
                     height: "100%",
                   }}
                 >
@@ -1759,11 +1731,11 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
               <Grid size={{ xs: 12, md: 6 }}>
                 <Box
                   sx={{
-                    backgroundColor: darkMode ? "#1e1e1e" : "#fff",
+                    bgcolor: "background.paper",
                     borderRadius: 2,
                     padding: 2,
                     border: "1px solid",
-                    borderColor: sectionBorder,
+                    borderColor: "rgba(118, 118, 118, 0.57)",
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",

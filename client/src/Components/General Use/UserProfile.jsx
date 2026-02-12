@@ -170,7 +170,7 @@ const UserProfile = ({ userData }) => {
                   color: darkMode ? "#9ca3af" : "#6b7280",
                 }}
               >
-                demo.user@syncbooks.local
+                demo.user@testproject.local
               </Typography>
             </Box>
           </UserProfileHeader>
