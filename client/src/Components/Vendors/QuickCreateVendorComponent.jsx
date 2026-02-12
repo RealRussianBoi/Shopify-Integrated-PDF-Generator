@@ -1,5 +1,4 @@
 //General Use Imports
-import axios from "axios";
 import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
 
@@ -55,18 +54,12 @@ const emptyValues = {
 function QuickCreateVendorComponent({
   open,
   onClose,
-  companyPk,
   onCreated,
-  darkMode = false,
 }) {
   const [values, setValues] = useState(emptyValues);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-
-  const sectionBorder = darkMode
-    ? "rgba(255,255,255,0.08)"
-    : "rgba(0,0,0,0.08)";
 
   const contactName = useMemo(() => {
     const f = values.repFirstName || "";
@@ -113,16 +106,21 @@ function QuickCreateVendorComponent({
     if (saving) return;
     setSaveError("");
 
-    if (!companyPk || isNaN(Number(companyPk))) {
-      setSaveError("Invalid companyPk.");
-      return;
-    }
-
     if (!validate()) return;
 
     setSaving(true);
     try {
-      const payload = {
+      const pk =
+        (globalThis.crypto?.randomUUID && globalThis.crypto.randomUUID()) ||
+        (() => {
+          // fallback: 16 bytes -> hex string
+          const bytes = new Uint8Array(16);
+          globalThis.crypto.getRandomValues(bytes);
+          return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+        })();
+
+      const createdVendor = {
+        pk,
         name: String(values.name || "").trim(),
         address: values.address || "",
         aptSuite: values.aptSuite || "",
@@ -141,26 +139,13 @@ function QuickCreateVendorComponent({
         repCellPhoneNumber: "",
         repEmail: "",
         notes: "",
-        companyPk,
         country: values.country || "US",
       };
 
-      const res = await axios.post("http://localhost:4000/vendors/add", payload);
-
-      const createdFromApi = res?.data?.vendor || null;
-      if (createdFromApi) {
-        onCreated?.(createdFromApi);
-        onClose?.();
-        return;
-      }
-
-      onCreated?.({
-        ...payload,
-        country: values.country,
-      });
+      onCreated?.(createdVendor);
       onClose?.();
     } catch (e) {
-      setSaveError(e?.response?.data || e?.message || "Failed to create vendor.");
+      setSaveError(e?.message || "Failed to create vendor.");
     } finally {
       setSaving(false);
     }
@@ -185,7 +170,7 @@ function QuickCreateVendorComponent({
           alignItems: "center",
           justifyContent: "space-between",
           borderBottom: "1px solid",
-          borderColor: sectionBorder,
+          borderColor: "rgba(255,255,255,0.08)",
         }}
       >
         <Typography sx={{ fontWeight: 700 }}>Create Vendor</Typography>
@@ -215,7 +200,7 @@ function QuickCreateVendorComponent({
           )}
 
           <Grid container spacing={2}>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 fullWidth
                 label={
@@ -231,7 +216,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Autocomplete
                 options={WORLD_COUNTRIES}
                 value={
@@ -258,7 +243,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 fullWidth
                 label="Address"
@@ -268,7 +253,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 fullWidth
                 label="Apartment, suite, etc"
@@ -278,7 +263,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
                 label="City"
@@ -288,7 +273,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
                 label="State"
@@ -298,7 +283,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 fullWidth
                 label="ZIP code"
@@ -308,7 +293,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 fullWidth
                 label="Contact name"
@@ -330,7 +315,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
                 label="Email address"
@@ -340,7 +325,7 @@ function QuickCreateVendorComponent({
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
                 label="Phone number"
@@ -358,7 +343,7 @@ function QuickCreateVendorComponent({
           px: 2,
           py: 1.5,
           borderTop: "1px solid",
-          borderColor: sectionBorder,
+          borderColor: "rgba(255,255,255,0.08)",
         }}
       >
         <Button onClick={onClose} disabled={saving} variant="outlined" color="inherit">
@@ -375,7 +360,6 @@ function QuickCreateVendorComponent({
 QuickCreateVendorComponent.propTypes = {
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  companyPk: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   onCreated: PropTypes.func,
   darkMode: PropTypes.bool,
 };

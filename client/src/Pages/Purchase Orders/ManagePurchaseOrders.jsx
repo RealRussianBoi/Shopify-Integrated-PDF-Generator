@@ -1306,11 +1306,14 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           disabled={finalizationController.disableFields}
                           onChange={(e) => {
                             const val = e.target.value;
+
                             if (val === ADD_VENDOR_VALUE) {
                               setQuickVendorOpen(true);
                               return;
                             }
-                            field.onChange(e);
+
+                            if (errors.vendorPk) clearErrors("vendorPk");
+                            field.onChange(val);
                           }}
                           renderValue={(value) => {
                             if (!value) return "Select vendor";
@@ -1326,11 +1329,40 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                             <strong>+ Add Vendor</strong>
                           </MenuItem>
 
-                          {vendorsList.map((v) => (
-                            <MenuItem key={v.pk} value={v.pk}>
-                              {v.name}
-                            </MenuItem>
-                          ))}
+                          {vendorsList.map((v) => {
+                            const line2 = [v.city, v.state, v.zipCode].filter(Boolean).join(", ");
+                            const addressTop = [v.address, v.aptSuite].filter(Boolean).join(v.aptSuite ? " " : "");
+                            const addressFull = [addressTop, line2, v.country].filter(Boolean).join(" • ");
+
+                            return (
+                              <MenuItem
+                                key={v.pk}
+                                value={v.pk}
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "flex-start",
+                                  py: 1.25,
+                                }}
+                              >
+                                <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                                  {v.name}
+                                </Typography>
+
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    mt: 0.25,
+                                    color: "text.secondary",
+                                    lineHeight: 1.2,
+                                    whiteSpace: "normal",
+                                  }}
+                                >
+                                  {addressFull || "—"}
+                                </Typography>
+                              </MenuItem>
+                            );
+                          })}
                         </Select>
 
                         {!!errors.vendorPk && (
