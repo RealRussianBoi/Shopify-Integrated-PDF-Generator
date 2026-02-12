@@ -31,7 +31,7 @@ app.use(
 );
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log("Server running on", PORT));
 
 const SHOP_NAME = process.env.shop_name; // e.g. "your-shop" OR "your-shop.myshopify.com"
 const SHOPIFY_ACCESS_TOKEN = process.env.acccess_token;
