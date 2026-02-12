@@ -97,7 +97,6 @@ const UserProfile = ({ userData }) => {
   const { darkMode, toggleDarkMode } = useTheme();
   const dropdownRef = useRef(null);
 
-  // ✅ Static content (no fetch)
   const staticCompanies = useMemo(
     () => [
       { pk: 1, name: "I am Richard Pashko" },
@@ -125,8 +124,6 @@ const UserProfile = ({ userData }) => {
   const handleAvatarClick = () => setIsOpen((prev) => !prev);
 
   const handleManageAccount = () => {
-    // ✅ Static behavior (optional)
-    // You can wire this later if you add settings routes
     console.log("Manage account (static placeholder)");
     setIsOpen(false);
   };
@@ -217,7 +214,6 @@ const UserProfile = ({ userData }) => {
 
           <Divider sx={{ backgroundColor: darkMode ? "#374151" : "#e5e7eb" }} />
 
-          {/* ✅ Dark/Light toggle at bottom (affects ThemeContext file you pasted) */}
           <Box sx={{ px: 2, py: 1.25 }}>
             <FormControlLabel
               sx={{ m: 0, width: "100%", display: "flex", justifyContent: "space-between" }}

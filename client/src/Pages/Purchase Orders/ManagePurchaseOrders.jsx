@@ -131,7 +131,6 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
   const [rowsBeingAdded, setRowsBeingAdded] = useState(true);
   const [tableRows, setTableRows] = useState([]);
-  const [everythingDisabled, setEverythingDisabled] = useState(false);
 
   const {
     control,
@@ -159,24 +158,26 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     return d;
   }, []);
 
-  const dueDateWatch = watch("dueDate");
-  const dateToShipWatch = watch("dateToShip");
-  const dateVoidWatch = watch("dateVoid");
+  const [dueDateWatch, dateToShipWatch, dateVoidWatch] = watch([
+    "dueDate",
+    "dateToShip",
+    "dateVoid",
+  ]);
 
   const shipmentDateWarnings = useMemo(() => {
     const warnings = [];
 
-    const toDate = (v) => (v instanceof Date && !isNaN(v) ? v : null);
-    const strip = (d) => {
-      if (!d) return null;
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
+    const toMidnight = (v) => {
+      if (!v) return null;
+      const d = v instanceof Date ? v : new Date(v);
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(0, 0, 0, 0);
+      return d;
     };
 
-    const ship = strip(toDate(dateToShipWatch));
-    const due = strip(toDate(dueDateWatch));
-    const voidD = strip(toDate(dateVoidWatch));
+    const ship = toMidnight(dateToShipWatch);
+    const due = toMidnight(dueDateWatch);
+    const voidD = toMidnight(dateVoidWatch);
 
     if (ship && due && due < ship) warnings.push("Due Date is earlier than Date To Ship.");
     if (voidD) {
@@ -184,13 +185,15 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
       if (due && voidD < due) warnings.push("Date Void is earlier than Due Date.");
     }
 
-    const isFiveYearsOutOrMore = (d) => d && d >= warningFutureDate;
-    if (isFiveYearsOutOrMore(ship) || isFiveYearsOutOrMore(due) || isFiveYearsOutOrMore(voidD)) {
-      warnings.push("One or more dates are 5+ years in the future.");
+    if (warningFutureDate) {
+      const isFiveYearsOutOrMore = (d) => d && d >= warningFutureDate;
+      if (isFiveYearsOutOrMore(ship) || isFiveYearsOutOrMore(due) || isFiveYearsOutOrMore(voidD)) {
+        warnings.push("One or more dates are 5+ years in the future.");
+      }
     }
 
     return warnings;
-  }, [dateToShipWatch, dueDateWatch, dateVoidWatch, warningFutureDate]);
+  }, [dueDateWatch, dateToShipWatch, dateVoidWatch, warningFutureDate]);
 
   // -----------------------------
   // Purchase Description "Dialog" editor
@@ -541,189 +544,70 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     fetchInitialData();
   }, [reset]);
 
-  // //Navbar Actions
-  // useEffect(() => {
-  //   const isAddPage = pageType === "Add";
-  //   const isEditPage = pageType === "Edit";
+  // Navbar Actions (Reset + Export)
+  const handleResetFields = () => {
+    // Reset form + clear rows back to your defaults
+    reset(defaultValues);
+    setTableRows([]);
+    clearErrors(); // optional: clears header + rows errors
+  };
 
-  //   setNavbarActions(
-  //     isMobile ? (
-  //       <Box
-  //         sx={{
-  //           display: "flex",
-  //           justifyContent: "center",
-  //           gap: 1,
-  //           px: 0.5,
-  //           py: 0.5,
-  //           border: "1px solid",
-  //           borderColor: "divider",
-  //           borderRadius: 2,
-  //           animation: shake ? "shake 0.5s" : "none",
-  //           "@keyframes shake": {
-  //             "0%, 100%": { transform: "translateX(0)" },
-  //             "20%": { transform: "translateX(-4px)" },
-  //             "40%": { transform: "translateX(4px)" },
-  //             "60%": { transform: "translateX(-4px)" },
-  //             "80%": { transform: "translateX(4px)" },
-  //           },
-  //         }}
-  //       >
-  //         <Button
-  //           variant="outlined"
-  //           color="inherit"
-  //           onClick={() => navigate("/purchase-orders")}
-  //           fullWidth
-  //           type="button"
-  //         >
-  //           Cancel
-  //         </Button>
+  const handleExportToPdf = () => {
+    // Simple baseline (works without extra deps):
+    // You can replace this with your real PDF export later (html2canvas/jspdf/etc.)
+    window.print();
+  };
 
-  //         {isAddPage && (
-  //           <Button
-  //             variant="contained"
-  //             color="primary"
-  //             fullWidth
-  //             disabled={finalizationController.disableFields}
-  //             onClick={saveDraft}
-  //             type="button"
-  //           >
-  //             Save Draft
-  //           </Button>
-  //         )}
+  useEffect(() => {
+    setNavbarActions(
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 1,
+          px: 0.5,
+          py: 0.5,
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 2,
+          width: isMobile ? "100%" : "auto",
+          maxWidth: isMobile ? 560 : "none",
+        }}
+      >
+        <Button
+          variant="outlined"
+          color="inherit"
+          type="button"
+          fullWidth={isMobile}
+          disabled={finalizationController.disableFields}
+          onClick={handleResetFields}
+        >
+          Reset Fields
+        </Button>
 
-  //         {isEditPage && (
-  //           isDraftPo ? (
-  //             <Button
-  //               variant="contained"
-  //               color="primary"
-  //               fullWidth
-  //               disabled={finalizationController.disableFields}
-  //               onClick={openSaveMenu}
-  //               type="button"
-  //               startIcon={<MoreVertIcon/>}
-  //             >
-  //               Save
-  //             </Button>
-  //           ) : (
-  //             <Button
-  //               variant="contained"
-  //               color="primary"
-  //               fullWidth
-  //               disabled={finalizationController.disableFields}
-  //               onClick={updateOfficialPo}
-  //               type="button"
-  //             >
-  //               Save
-  //             </Button>
-  //           )
-  //         )}
+        <Button
+          variant="contained"
+          color="secondary"
+          type="button"
+          fullWidth={isMobile}
+          disabled={finalizationController.disableFields}
+          startIcon={<FileDownloadIcon />}
+          onClick={handleExportToPdf}
+        >
+          Export To PDF
+        </Button>
+      </Box>
+    );
 
-  //         {!isAddPage && !isEditPage && (
-  //           <Button
-  //             variant="contained"
-  //             color="primary"
-  //             fullWidth
-  //             disabled={finalizationController.disableFields}
-  //             onClick={updateDraft}
-  //             type="button"
-  //             startIcon={<MoreVertIcon/>}
-  //           >
-  //             Save
-  //           </Button>
-  //         )}
-  //       </Box>
-  //     ) : (
-  //       <Alert
-  //         severity="info"
-  //         sx={{
-  //           display: "flex",
-  //           alignItems: "center",
-  //           animation: shake ? "shake 0.5s" : "none",
-  //           "@keyframes shake": {
-  //             "0%, 100%": { transform: "translateX(0)" },
-  //             "20%": { transform: "translateX(-4px)" },
-  //             "40%": { transform: "translateX(4px)" },
-  //             "60%": { transform: "translateX(-4px)" },
-  //             "80%": { transform: "translateX(4px)" },
-  //           },
-  //         }}
-  //       >
-  //         <span>Save your changes here: </span>
-
-  //         <Button
-  //           variant="outlined"
-  //           color="inherit"
-  //           onClick={() => navigate("/purchase-orders")}
-  //           style={{ marginRight: "10px" }}
-  //           type="button"
-  //         >
-  //           Cancel
-  //         </Button>
-
-  //         {isAddPage && (
-  //           <Button
-  //             variant="contained"
-  //             color="primary"
-  //             onClick={saveDraft}
-  //             disabled={finalizationController.disableFields}
-  //             type="button"
-  //           >
-  //             Save Draft
-  //           </Button>
-  //         )}
-
-  //         {isEditPage && (
-  //           isDraftPo ? (
-  //             <Button
-  //               variant="contained"
-  //               color="primary"
-  //               onClick={openSaveMenu}
-  //               disabled={finalizationController.disableFields}
-  //               type="button"
-  //               startIcon={<MoreVertIcon/>}
-  //             >
-  //               Save
-  //             </Button>
-  //           ) : (
-  //             <Button
-  //               variant="contained"
-  //               color="primary"
-  //               onClick={updateOfficialPo}
-  //               disabled={finalizationController.disableFields}
-  //               type="button"
-  //             >
-  //               Save
-  //             </Button>
-  //           )
-  //         )}
-
-  //         {!isAddPage && !isEditPage && (
-  //           <Button
-  //             variant="contained"
-  //             color="primary"
-  //             onClick={updateDraft}
-  //             disabled={finalizationController.disableFields}
-  //             type="button"
-  //             startIcon={<MoreVertIcon/>}
-  //           >
-  //             Save
-  //           </Button>
-  //         )}
-  //       </Alert>
-  //     )
-  //   );
-
-  //   return () => setNavbarActions(null);
-  // }, [
-  //   setNavbarActions,
-  //   pageType,
-  //   navigate,
-  //   isMobile,
-  //   shake,
-  //   finalizationController.disableFields,
-  //   everythingDisabled,
-  //   tableRows
-  // ]);
+    return () => setNavbarActions(null);
+  }, [
+    setNavbarActions,
+    isMobile,
+    finalizationController.disableFields,
+    reset,
+    defaultValues,
+    clearErrors,
+  ]);
 
   // -----------------------------
   // UI helpers (unchanged)
@@ -950,7 +834,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     ),
   };
 
-  const baseColumns = [
+  const baseColumns = useMemo(() =>([
     {
       ...LEFT,
       field: "headerImage",
@@ -1162,7 +1046,10 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
       valueGetter: (v) => Number(v ?? 0),
       valueFormatter: (v) => `$${formatMoney(v ?? 0, 2)}`,
     },
-  ];
+  ]), [
+    isMobile,
+    tableRows
+  ]);
 
   const editableDataGrid = useMemo(() => {
     const actionsCol = {
@@ -1191,7 +1078,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     };
 
     return [actionsCol, ...baseColumns];
-  }, [baseColumns, tableRows, finalizationController]);
+  }, [baseColumns, tableRows]);
 
   //Prevents form submission from pressing enter button.
   const handlePressEnter = (event) => {
@@ -1229,41 +1116,25 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
     return roundTo(sum, 4);
   }, [tableRows]);
 
+  const discountPercent = watch("discountPercent");
+  const discountAmount  = watch("discountAmount");
+  const freight         = watch("freight");
+  const fee             = watch("fee");
+  const tax             = watch("tax");
+
   const summaryCalc = useMemo(() => {
-    const discountPercent = money(watch("discountPercent"));
-    const discountAmount = money(watch("discountAmount"));
-    const freight = money(watch("freight"));
-    const fee = money(watch("fee"));
-    const tax = money(watch("tax"));
+    const dp = money(discountPercent);
+    const da = money(discountAmount);
+    const fr = money(freight);
+    const fe = money(fee);
+    const tx = money(tax);
 
-    const percentDiscountValue = roundTo(tableSubtotal * (discountPercent / 100), 4);
-
-    // Discounts reduce total, others increase
-    const netAdditional = roundTo(
-      -percentDiscountValue - discountAmount + freight + fee + tax,
-      4
-    );
-
+    const percentDiscountValue = roundTo(tableSubtotal * (dp / 100), 4);
+    const netAdditional = roundTo(-percentDiscountValue - da + fr + fe + tx, 4);
     const tableTotal = roundTo(tableSubtotal + netAdditional, 4);
 
-    return {
-      discountPercent,
-      discountAmount,
-      freight,
-      fee,
-      tax,
-      percentDiscountValue,
-      netAdditional,
-      tableTotal,
-    };
-  }, [
-    tableSubtotal,
-    watch("discountPercent"),
-    watch("discountAmount"),
-    watch("freight"),
-    watch("fee"),
-    watch("tax"),
-  ]);
+    return { dp, da, fr, fe, tx, percentDiscountValue, netAdditional, tableTotal };
+  }, [tableSubtotal, discountPercent, discountAmount, freight, fee, tax]);
 
   return (
     <Box className="page-responsive-width" sx={{ display: "flex", flexDirection: "column" }}>
@@ -1356,6 +1227,12 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           label="Due Date"
                           disabled={finalizationController.disableFields}
                           minDate={today}
+                          slotProps={{
+                            textField: {
+                              fullWidth: true,
+                              size: "small",
+                            }
+                          }}
                         />
                       </LocalizationProvider>
                     )}
@@ -1373,6 +1250,12 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           label="Date To Ship"
                           disabled={finalizationController.disableFields}
                           minDate={today}
+                          slotProps={{
+                            textField: {
+                              fullWidth: true,
+                              size: "small",
+                            }
+                          }}
                         />
                       </LocalizationProvider>
                     )}
@@ -1390,6 +1273,12 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           label="Date Void"
                           disabled={finalizationController.disableFields}
                           minDate={today}
+                          slotProps={{
+                            textField: {
+                              fullWidth: true,
+                              size: "small",
+                            }
+                          }}
                         />
                       </LocalizationProvider>
                     )}
@@ -1527,11 +1416,47 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                             <em>Select destination</em>
                           </MenuItem>
 
-                          {destinationsList.map((d) => (
-                            <MenuItem key={d.pk} value={d.pk}>
-                              {d.name}
-                            </MenuItem>
-                          ))}
+                          {destinationsList.map((d) => {
+                            const line2 = String(d.addressLine2 || "").trim();
+                            const city = String(d.addressCity || "").trim();
+                            const region = String(d.addressRegion || "").trim();
+                            const postal = String(d.addressPostalCode || "").trim();
+                            const country = String(d.addressCountryCode || "").trim();
+
+                            const addressLineTop = [d.addressLine1, line2].filter(Boolean).join(line2 ? " " : "");
+                            const addressLineBottom = [city, region, postal].filter(Boolean).join(", ");
+
+                            const addressFull = [addressLineTop, addressLineBottom, country].filter(Boolean).join(" • ");
+
+                            return (
+                              <MenuItem
+                                key={d.pk}
+                                value={d.pk}
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "flex-start",
+                                  py: 1.25,
+                                }}
+                              >
+                                <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                                  {d.name}
+                                </Typography>
+
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    mt: 0.25,
+                                    color: "text.secondary",
+                                    lineHeight: 1.2,
+                                    whiteSpace: "normal",
+                                  }}
+                                >
+                                  {addressFull || "—"}
+                                </Typography>
+                              </MenuItem>
+                            );
+                          })}
                         </Select>
 
                         {!!errors.destinationPk && (
@@ -1897,10 +1822,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                       } = summaryCalc;
 
                       const line = (label, value, isDiscount = false) => (
-                        <Box
-                          key={label}
-                          sx={{ mt: 0.75, display: "flex", justifyContent: "space-between" }}
-                        >
+                        <Box key={label} sx={{ mt: 0.75, display: "flex", justifyContent: "space-between" }}>
                           <Typography color="text.secondary">{label}</Typography>
                           <Typography color="text.primary">
                             {isDiscount ? "-" : "+"}${formatMoney(value || 0, 2)}
@@ -1919,8 +1841,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
                           </Box>
 
                           {/* Breakdown */}
-                          {discountPercent > 0 &&
-                            line(`Discount (${discountPercent}%)`, percentDiscountValue, true)}
+                          {discountPercent > 0 && line(`Discount (${discountPercent}%)`, percentDiscountValue, true)}
                           {discountAmount > 0 && line("Discount ($)", discountAmount, true)}
                           {freight > 0 && line("Freight", freight)}
                           {fee > 0 && line("Fee", fee)}

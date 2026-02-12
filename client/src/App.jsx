@@ -1,4 +1,3 @@
-// App.jsx
 // General Use Imports
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
@@ -24,7 +23,7 @@ function CenterLayout() {
       <Outlet />
     </Box>
   );
-}
+};
 
 export default function App() {
   const muiTheme = useMuiTheme();
@@ -62,7 +61,7 @@ export default function App() {
       <UpperNavbar reference={upperNavBarRef} actions={navbarActions} />
 
       {/* This is the "space" for the fixed AppBar */}
-      <Box sx={{ pt: `${navBarMargin + 10}px` }}>
+      <Box sx={{ pt: `${navBarMargin + 10}px`, pb: "10px" }}>
         <Routes>
           <Route element={<CenterLayout />}>
             <Route path="/" element={<Navigate to="/purchase-order/add" replace />} />

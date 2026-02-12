@@ -174,8 +174,11 @@ function PriceAugmentComponent({
                   ),
                 }}
                 onChange={(e) => {
-                  field.onChange(e);
-                  setValue("discountValue", e.target.value, { shouldDirty: true, shouldValidate: true });
+                  field.onChange(e.target.value);
+                }}
+                onBlur={() => {
+                  discountEditingRef.current = false;
+                  handleDiscountBlur(field.value);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "-" || e.key === "Minus") e.preventDefault();
@@ -183,10 +186,6 @@ function PriceAugmentComponent({
                 onFocus={(e) => {
                   discountEditingRef.current = true;
                   e.target.select();
-                }}
-                onBlur={() => {
-                  discountEditingRef.current = false;
-                  handleDiscountBlur(field.value);
                 }}
                 onWheel={(e) => e.target.blur()}
               />
@@ -225,14 +224,13 @@ function PriceAugmentComponent({
                   startAdornment: <InputAdornment position="start">$</InputAdornment>,
                 }}
                 onChange={(e) => {
-                  field.onChange(e);
-                  setValue("freight", e.target.value, { shouldDirty: true, shouldValidate: true });
+                  field.onChange(e.target.value); // no setValue here
                 }}
+                onBlur={applyMoneyOnBlur("freight")} // setValue + shouldValidate happens once here
                 onKeyDown={(e) => {
                   if (e.key === "-" || e.key === "Minus") e.preventDefault();
                 }}
                 onFocus={(e) => e.target.select()}
-                onBlur={applyMoneyOnBlur("freight")}
               />
             )}
           />
@@ -269,14 +267,13 @@ function PriceAugmentComponent({
                   startAdornment: <InputAdornment position="start">$</InputAdornment>,
                 }}
                 onChange={(e) => {
-                  field.onChange(e);
-                  setValue("fee", e.target.value, { shouldDirty: true, shouldValidate: true });
+                  field.onChange(e.target.value); // no setValue here
                 }}
+                onBlur={applyMoneyOnBlur("fee")}
                 onKeyDown={(e) => {
                   if (e.key === "-" || e.key === "Minus") e.preventDefault();
                 }}
                 onFocus={(e) => e.target.select()}
-                onBlur={applyMoneyOnBlur("fee")}
               />
             )}
           />

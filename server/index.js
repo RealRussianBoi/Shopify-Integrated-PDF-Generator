@@ -52,7 +52,7 @@ app.get("/purchase-order/data-for-new", async (req, res) => {
       },
       {
         pk: 102,
-        name: "Northeast DC",
+        name: "Northeast DC Warehouse",
         description: "Regional distribution center",
         active: true,
 
@@ -68,7 +68,7 @@ app.get("/purchase-order/data-for-new", async (req, res) => {
       },
       {
         pk: 103,
-        name: "West Coast DC",
+        name: "West Coast DC Warehouse",
         description: "Overflow and returns processing",
         active: true,
 
