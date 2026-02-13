@@ -310,8 +310,7 @@ const WORLD_COUNTRIES = [
   { value: "AX", label: "Åland Islands" },
 ];
 
-// ✅ Export with phone param added
-export default WORLD_COUNTRIES.map((c) => {
+export default WORLD_COUNTRIES_CLIENT.map((c) => {
   const iso2 = String(c.value || "").toUpperCase();
   const raw = ISO2_TO_PHONE_RAW[iso2] ?? "";
   return {

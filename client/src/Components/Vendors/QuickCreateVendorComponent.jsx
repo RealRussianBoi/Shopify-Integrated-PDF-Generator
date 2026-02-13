@@ -20,7 +20,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 
 //Custom Imports
-import WORLD_COUNTRIES from "../../utils/Countries/WORLD_COUNTRIES.js";
+import WORLD_COUNTRIES_CLIENT from "../../utils/Countries/WORLD_COUNTRIES_CLIENT";
 
 // Match your DB column sizes
 const charLimits = {
@@ -218,12 +218,12 @@ function QuickCreateVendorComponent({
 
             <Grid size={12}>
               <Autocomplete
-                options={WORLD_COUNTRIES}
+                options={WORLD_COUNTRIES_CLIENT}
                 value={
-                  WORLD_COUNTRIES.find((c) => c.value === values.country) || null
+                  WORLD_COUNTRIES_CLIENT.find((c) => c.value === values.country) || null
                 }
                 onChange={(_, option) => setField("country", option?.value || "")}
-                disableClearable={false} // ✅ must pick; can clear but validation will block save
+                disableClearable={false}
                 fullWidth
                 getOptionLabel={(option) => option?.label || ""}
                 isOptionEqualToValue={(option, value) => option.value === value.value}
