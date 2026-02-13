@@ -20,16 +20,6 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(express.json({ limit: "25mb" }));
 
-// Allow your frontend (add your GitHub Pages origin later)
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173", // Vite dev
-      "http://localhost:3000",
-    ],
-  })
-);
-
 app.use(cors({
   origin: [
     "http://localhost:5173",
@@ -37,19 +27,6 @@ app.use(cors({
     "https://realrussianboi.github.io/Shopify-Integrated-PDF-Generator",
   ],
 }));
-
-app.use(cors({
-  origin: (origin, cb) => {
-    // allow server-to-server / curl (no origin)
-    if (!origin) return cb(null, true);
-    return cb(null, ALLOWED_ORIGINS.has(origin));
-  },
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
-
-// IMPORTANT: respond to preflight
-app.options("/*", cors());
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Server running on", PORT));
