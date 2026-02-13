@@ -417,7 +417,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
       setLoading(true);
 
       try {
-        const res = await axios.get("http://localhost:4000/product-browser-list", {
+        const res = await axios.get("https://shopify-integrated-pdf-generator.onrender.com/product-browser-list", {
           params: {
             search: String(search || "").trim(),
             searchField: String(searchFieldArg || "all"),
@@ -520,7 +520,7 @@ const MemoProductBrowserDialog = memo(function MemoProductBrowserDialog({
         const total = Number(product.variantTotal || 0);
 
         while (offset < total) {
-          const res = await axios.get("http://localhost:4000/product-browser-variants", {
+          const res = await axios.get("https://shopify-integrated-pdf-generator.onrender.com/product-browser-variants", {
             params: {
               productPk,
               variantOffset: offset,

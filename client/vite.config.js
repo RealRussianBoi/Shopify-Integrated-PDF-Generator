@@ -1,9 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
-// https://vite.dev/config/
-export default defineConfig({
-  base: "/Shopify-Integrated-PDF-Generator/",
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-});
-
+  base: mode === "production" ? "/Shopify-Integrated-PDF-Generator/" : "/",
+}));
