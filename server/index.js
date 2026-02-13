@@ -38,6 +38,19 @@ app.use(cors({
   ],
 }));
 
+app.use(cors({
+  origin: (origin, cb) => {
+    // allow server-to-server / curl (no origin)
+    if (!origin) return cb(null, true);
+    return cb(null, ALLOWED_ORIGINS.has(origin));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+// IMPORTANT: respond to preflight
+app.options("*", cors());
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Server running on", PORT));
 
