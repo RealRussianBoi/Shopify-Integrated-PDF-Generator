@@ -20,7 +20,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 
 //Custom Imports
-import WORLD_COUNTRIES from "../../utils/Countries/WORLD_COUNTRIES";
+import WORLD_COUNTRIES from "../../utils/Countries/WORLD_COUNTRIES.js";
 
 // Match your DB column sizes
 const charLimits = {
