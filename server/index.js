@@ -11,7 +11,7 @@ import { Readable } from "stream";
 import fontkit from "@pdf-lib/fontkit";
 import WORLD_COUNTRIES from "./utils/Countries/WORLD_COUNTRIES.js";
 
-dotenv.config();
+dotenv.config(); 
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
