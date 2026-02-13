@@ -34,7 +34,7 @@ This is the store from which our server fetches products.
 
 ## The below PDF is an example of the Purchase Order PDF generation the program is capable of.
 
-[Sample Purchase Order.pdf](https://github.com/user-attachments/files/25276297/Sample.Purchase.Order.pdf)
+[Purchase Order 10001.pdf](https://github.com/user-attachments/files/25278674/Purchase.Order.10001.pdf)
 
 ## KEEP IN MIND
 The server for this project is hosted on a free version of Render, and is allocated only 512 MB of Ram, and 0.1 CPU.
