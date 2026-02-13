@@ -1,3 +1,6 @@
+## Quick Access Link
+https://realrussianboi.github.io/Shopify-Integrated-PDF-Generator/
+
 # Shopify-Integrated PDF Generator
 
 A full-stack JavaScript demo app that pulls live product data from Shopify, collects purchase order details in a React UI, and generates a polished, downloadable PDF on demand.
