@@ -39,7 +39,3 @@ This is the store from which our server fetches products.
 The server for this project is hosted on a free version of Render, and is allocated only 512 MB of Ram, and 0.1 CPU.
 When creating a purchase order with at least 3 products, please wait at least ten to fifteen seconds for the PDF to be generated.
 The time required for generating a PDF scales with product quantity only because the CPU is severely limited on the free Render hosting version.
-
-## Final Note
-I was planning to add database functionality to this project, but due to time constraints at my current job I limited this project to using Shopify as the source of product data.
-Keep in mind that I am capable of using databases as a Fullstack JavaScript Engineer.
