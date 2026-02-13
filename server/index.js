@@ -49,7 +49,7 @@ app.use(cors({
 }));
 
 // IMPORTANT: respond to preflight
-app.options("*", cors());
+app.options("/*", cors());
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Server running on", PORT));
