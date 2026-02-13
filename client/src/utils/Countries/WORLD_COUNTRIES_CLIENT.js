@@ -58,7 +58,7 @@ const normalizeDialPrefix = (raw) => {
   return digits ? `+${digits}` : "";
 };
 
-const WORLD_COUNTRIES = [
+const WORLD_COUNTRIES_CLIENT = [
   { value: "AF", label: "Afghanistan" },
   { value: "AL", label: "Albania" },
   { value: "DZ", label: "Algeria" },
