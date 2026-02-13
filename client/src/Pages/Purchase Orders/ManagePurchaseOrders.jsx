@@ -587,7 +587,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
     try {
       const res = await axios.post(
-        "http://localhost:4000/purchase-order/export/pdf",
+        "https://shopify-integrated-pdf-generator.onrender.com/purchase-order/export/pdf",
         payload,
         { responseType: "blob" }
       );
@@ -656,7 +656,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
         setTableRows([]);
 
         // 1) Lists for dropdowns (+ optional suggested PO number)
-        const listsRes = await axios.get("http://localhost:4000/purchase-order/data-for-new");
+        const listsRes = await axios.get("https://shopify-integrated-pdf-generator.onrender.com/purchase-order/data-for-new");
 
         const nextVendors = listsRes.data?.vendorsList || [];
         const nextDestinations = listsRes.data?.warehousesList || [];
@@ -751,7 +751,7 @@ function ManagePurchaseOrder({ setNavbarActions = () => {} }) {
 
   const getItemDetails = async (selectedVariants) => {
     try {
-      const response = await axios.get("http://localhost:4000/purchase-order/get/item-data", {
+      const response = await axios.get("https://shopify-integrated-pdf-generator.onrender.com/purchase-order/get/item-data", {
         params: {
           selectedPks: selectedVariants.map((s) => s.variantPk), // Shopify variant GID
         },
