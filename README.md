@@ -25,7 +25,6 @@ This repo is a focused demonstration of:
 * Form state management and validation (react-hook-form)
 * File responses in web apps (returning a PDF blob to the client)
 * Programmatic document generation (pdf-lib) with real layout constraints
-*
 
 ## The below image shows the live Shopify store populated with sample Snowboard products.
 <img width="2501" height="1263" alt="Products Page Test Store" src="https://github.com/user-attachments/assets/472385cf-f1cf-4471-93de-c7747d1dc294" />
