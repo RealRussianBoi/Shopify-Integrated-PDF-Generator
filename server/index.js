@@ -11,7 +11,7 @@ import { Readable } from "stream";
 import fontkit from "@pdf-lib/fontkit";
 import WORLD_COUNTRIES from "./utils/Countries/WORLD_COUNTRIES.js";
 
-dotenv.config(); 
+dotenv.config();
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +29,14 @@ app.use(
     ],
   })
 );
+
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://realrussianboi.github.io",
+    "https://realrussianboi.github.io/Shopify-Integrated-PDF-Generator",
+  ],
+}));
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Server running on", PORT));
